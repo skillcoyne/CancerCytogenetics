@@ -1,7 +1,10 @@
 require_relative 'utils/karyotype_reader'
 require_relative 'aberration'
+require_relative 'chromosome'
 require_relative 'chromosome_aberrations'
 require_relative 'breakpoint'
+
+require 'yaml'
 
 class Karyotype
   include KaryotypeReader
@@ -11,12 +14,12 @@ class Karyotype
   attr_reader :aberrations, :karyotype, :breakpoints, :ploidy, :sex
 
   class<<self
-    attr_accessor :normal_chr, :aberration_objs
+    attr_accessor :normal_chr, :abnormal_chr, :aberration_objs
   end
 
   def initialize(str)
     @karyotype = str.gsub(/\s/, "")
-    @normal_chr = {}; @aberrations = {}; @breakpoints = {}
+    @normal_chr = {}; @abnormal_chr = {}; @aberrations = {}; @breakpoints = {}
     setup_abberation_objs()
     prep_karyotype()
     find_breaks()
@@ -25,22 +28,24 @@ class Karyotype
 
   def analyze
     Aberration.breakpoint_regex.each do |abr_type|
-      puts abr_type
+      #puts abr_type
       next unless @aberrations.has_key? abr_type
       @aberrations[abr_type].each do |abr|
         chr_i = find_chr(abr)
         band_i = find_bands(abr, chr_i[:end_index])
 
         # just a check
-        raise KaryotypeError, "Bands and chromosomes don't match up: #{abr}" unless chrs[:chr].length.eql? bands[:bands].length
+        raise KaryotypeError, "Bands and chromosomes don't match up: #{abr}" unless chr_i[:chr].length.eql? band_i[:bands].length
 
+        ## TODO deal with the case of 2 chromosomes defined in the aberration
+        chr = Chromosome.new(chr_i[:chr][0])
+        chr.aberration( @aberration_obj[abr_type].new(abr) )
 
-
+        @abnormal_chr[chr.name] = [] unless @abnormal_chr.has_key?chr.name
+        @abnormal_chr[chr.name].push(chr)
       end
 
-
     end
-
 
   end
 

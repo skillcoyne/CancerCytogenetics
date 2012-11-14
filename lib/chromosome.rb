@@ -6,14 +6,22 @@ class Chromosome
   include BandReader
 
   class<<self
-    attr_accessor :normal_bands
+    attr_accessor :normal_bands, :aberrations
   end
 
   attr_reader :name
 
 
-  def initialize(*args)
-    raise ArgumentError, "#{args}" unless args[:chr]
+  def initialize(chr)
+    raise ArgumentError, "#{chr} is not a valid chromosome identifier." unless (chr.is_a?String and chr.match(/^\d+|X|Y$/))
+    @name = chr
+    @aberrations = []
+    ## TODO get bands
+  end
+
+  def aberration(obj)
+    raise ArgumentError, "Not an Aberration object" unless obj.is_a?Aberration
+    @aberrations.push(obj)
   end
 
 

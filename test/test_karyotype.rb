@@ -11,17 +11,20 @@ k = [
 
 
 #puts k[0]
-#kt = Karyotype.new(k[0])
-#puts kt.sex
-#puts kt.ploidy
-#puts kt.karyotype.join(",")
-#puts YAML::dump kt.aberrations
+kt = Karyotype.new(k[0])
+puts kt.sex
+puts kt.ploidy
+puts kt.karyotype.join(",")
+puts  kt.aberrations
+kt.analyze
+
 #puts kt.breakpoints
 
 #puts ChromosomeAberrations::Inversion.type
 #puts ChromosomeAberrations::Inversion.regex
 #exit
 
+exit
 
 
 
