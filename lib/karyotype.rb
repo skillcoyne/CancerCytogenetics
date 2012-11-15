@@ -57,7 +57,7 @@ class Karyotype
 
 
   # get breakpoints for the karyotype
-  def breakpoints
+  def report_breakpoints
     bps = []
     @abnormal_chr.each_pair do |c, chr_list|
       chr_list.each do |chr|
@@ -67,20 +67,22 @@ class Karyotype
     return bps.flatten!
   end
 
+  def report_ploidy_change
+    pd = []
+    pd << @aberrations[:loss].map {|e| "-#{e}" } if @aberrations[:loss]
+    pd << @aberrations[:gain].map {|e| "+#{e}" } if @aberrations[:gain]
+    return pd.flatten!
+  end
+
+
 
   def summarize
-
-    #puts YAML::dump @normal_chr
-    #
-    #puts YAML::dump @abnormal_chr
-
     puts "NORMAL CHROMOSOMES:"
     @normal_chr.each_pair do |chr, count|
       puts "#{chr}: #{count}"
     end
 
     puts "ABNORMAL:"
-
     @abnormal_chr.each_pair do |chr, list|
       puts "#{chr}"
       list.each do |c|
