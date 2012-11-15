@@ -22,13 +22,9 @@ k = [
 
   kt = Karyotype.new(k[0])
 
-  kt.summarize
-
-exit
-
   puts " #{kt.ploidy*23}, #{kt.sex}, #{kt.karyotype.join(',')}"
 
-  puts  kt.aberrations
+
 
   puts "Breakpoints:\n\t" + kt.breakpoints.join("\t\n")
 

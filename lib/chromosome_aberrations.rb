@@ -62,31 +62,25 @@ module ChromosomeAberrations
     @kt = 'der'
     @rx = /^der\(/
 
-    class<<self
+
+    def get_breakpoints(str)
       @aberrations = []
-    end
-
-
-    def breakpoints
-      puts "*** DERIVATIVE #{@abr}"
 
       ab_objs = Aberration.aberration_objs
 
-      chr_i = find_chr(@abr)
-      puts chr_i
-      derivative_abr = @abr[chr_i[:end_index]+1..@abr.length]
+      chr_i = find_chr(str)
+      derivative_abr = str[chr_i[:end_index]+1..str.length]
 
       # separate different abnormalities within the derivative chromosome and clean it up to make it parseable
       abnormalities = derivative_abr.scan(/([^\(\)]+\(([^\(\)]|\)\()*\))/).collect { |a| a[0] }
 
       abnormalities.each do |abn|
-        @breakpoints += get_breakpoints(@abr)
         abrclass = Aberration.classify_aberration(abn)
         ab_obj = ab_objs[abrclass].new(abn)
-        puts YAML::dump ab_obj
+        @aberrations << ab_obj
+        @breakpoints << ab_obj.breakpoints
       end
-      exit
-
+      #@breakpoints.flatten!
     end
 
   end
@@ -96,16 +90,14 @@ module ChromosomeAberrations
     @kt = 'trans'
     @rx = /^t\(/
 
-    def breakpoints
-      puts "TRANSLOCATION"
-      chr_i = find_chr(@abr)
-      band_i = find_bands(@abr, chr_i[:end_index])
+    def get_breakpoints(str)
+      chr_i = find_chr(str)
+      band_i = find_bands(str, chr_i[:end_index])
 
       chr_i[:chr].each_with_index do |c,i|
         @breakpoints << Breakpoint.new(c, band_i[:bands][i], 'trans')
       end
-
-
+      #@breakpoints.flatten!
     end
 
     :private

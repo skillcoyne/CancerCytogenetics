@@ -1,10 +1,7 @@
 require 'yaml'
 
 class Aberration
-
-
-  attr_reader :abr, :ab_objs
-
+  attr_reader :abr, :ab_objs, :breakpoints
 
   class<<self
     @kt = 'unk'
@@ -18,7 +15,6 @@ class Aberration
       end
       return aberration_obj
     end
-
   end
 
   def self.type
@@ -64,17 +60,12 @@ class Aberration
     # make sure it really is an inversion first
     #raise KaryotypeError, "#{str} does not appear to be a #{self.class}" unless str.match(self.regex)
 
-    breakpoints()
+    #@breakpoints += get_breakpoints(@abr)
+    get_breakpoints(@abr)
+    @breakpoints.flatten!
   end
-
-  def breakpoints
-    @breakpoints += get_breakpoints(@abr)
-  end
-
 
   :private
-
-
   def get_breakpoints(str)
     bps = []
     chr_i = find_chr(str)
@@ -86,12 +77,11 @@ class Aberration
       if band_i
         b = band_i[:bands][i]
         fragments = find_fragments(b)
-        fragments.each { |f| bps.push(Breakpoint.new(c, f, @type)) }
+        fragments.each { |f| @breakpoints << Breakpoint.new(c, f, @type) }
       else
-        bps.push(Breakpoint.new(c, "", @type))
+        @breakpoints << Breakpoint.new(c, "", @type)
       end
     end
-    return bps
   end
 
   # Parsing aberration strings to pull out the chromosome and band definitions

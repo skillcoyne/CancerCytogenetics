@@ -21,7 +21,7 @@ class Karyotype
   end
 
   def initialize(str)
-    raise ArgumentError, "#{str} is not a karyotype." unless str.is_a?String
+    raise ArgumentError, "#{str} is not a karyotype." unless str.is_a? String
 
     @karyotype = str.gsub(/\s/, "")
     @normal_chr = {}; @abnormal_chr = {}; @aberrations = {}; @unclear_aberrations = [];
@@ -56,22 +56,25 @@ class Karyotype
   end
 
 
-
   # get breakpoints for the karyotype
   def breakpoints
     bps = []
     @abnormal_chr.each_pair do |c, chr_list|
       chr_list.each do |chr|
-        bps = [bps, chr.breakpoints].flatten
+        bps << chr.breakpoints
       end
-      return bps
     end
+    return bps.flatten!
   end
 
 
   def summarize
-    puts "NORMAL CHROMOSOMES:"
 
+    #puts YAML::dump @normal_chr
+    #
+    #puts YAML::dump @abnormal_chr
+
+    puts "NORMAL CHROMOSOMES:"
     @normal_chr.each_pair do |chr, count|
       puts "#{chr}: #{count}"
     end
@@ -80,9 +83,11 @@ class Karyotype
 
     @abnormal_chr.each_pair do |chr, list|
       puts "#{chr}"
-      list.each {|c| puts YAML::dump c}
+      list.each do |c|
+        puts c.aberrations
+        puts c.breakpoints
+      end
     end
-
   end
 
 
@@ -94,11 +99,11 @@ class Karyotype
 
 
   def handle_ploidy_diff
-    @aberrations[:loss].each {|c| @normal_chr[c] -= 1} if @aberrations[:loss]
-    @aberrations[:gain].each {|c| @normal_chr[c] += 1} if @aberrations[:gain]
+    @aberrations[:loss].each { |c| @normal_chr[c] -= 1 } if @aberrations[:loss]
+    @aberrations[:gain].each { |c| @normal_chr[c] += 1 } if @aberrations[:gain]
   end
 
-  # determine ploidy & gender, clean up each aberration and drop any "unknown"
+# determine ploidy & gender, clean up each aberration and drop any "unknown"
   def prep_karyotype
     clones = @karyotype.scan(/(\[\d+\])/).collect { |a| a[0] }
     log.warn("Karyotype is a collection of clones, analysis may be inaccurate. #{@karyotype}") if clones.length > 3
@@ -129,11 +134,11 @@ class Karyotype
 
 
     @aberrations.each_pair do |abrclass, abrlist|
-      next if (abrclass.eql?ChromosomeAberrations::ChromosomeGain.type or abrclass.eql?ChromosomeAberrations::ChromosomeLoss.type)
+      next if (abrclass.eql? ChromosomeAberrations::ChromosomeGain.type or abrclass.eql? ChromosomeAberrations::ChromosomeLoss.type)
       # aberrations other than chromosome gains/losses should be uniquely represented
 
-      counts = abrlist.inject(Hash.new(0)) {|h,i| h[i] += 1; h }
-      counts.each_pair {|k,v| log.warn("#{k} was seen multiple times. Analyzed only once.") if v > 1 }
+      counts = abrlist.inject(Hash.new(0)) { |h, i| h[i] += 1; h }
+      counts.each_pair { |k, v| log.warn("#{k} was seen multiple times. Analyzed only once.") if v > 1 }
 
       @aberrations[abrclass] = abrlist.uniq
     end
