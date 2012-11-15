@@ -61,12 +61,60 @@ module ChromosomeAberrations
   class Derivative < Aberration
     @kt = 'der'
     @rx = /^der\(/
+
+    class<<self
+      @aberrations = []
+    end
+
+
+    def breakpoints
+      puts "*** DERIVATIVE #{@abr}"
+
+      ab_objs = Aberration.aberration_objs
+
+      chr_i = find_chr(@abr)
+      puts chr_i
+      derivative_abr = @abr[chr_i[:end_index]+1..@abr.length]
+
+      # separate different abnormalities within the derivative chromosome and clean it up to make it parseable
+      abnormalities = derivative_abr.scan(/([^\(\)]+\(([^\(\)]|\)\()*\))/).collect { |a| a[0] }
+
+      abnormalities.each do |abn|
+        @breakpoints += get_breakpoints(@abr)
+        abrclass = Aberration.classify_aberration(abn)
+        ab_obj = ab_objs[abrclass].new(abn)
+        puts YAML::dump ab_obj
+      end
+      exit
+
+    end
+
   end
 
   ## TRANSLOCATION ... this is typically a subset of Derivative chromosomes, but have seen it on it's own
   class Translocation < Aberration
     @kt = 'trans'
     @rx = /^t\(/
+
+    def breakpoints
+      puts "TRANSLOCATION"
+      chr_i = find_chr(@abr)
+      band_i = find_bands(@abr, chr_i[:end_index])
+
+      chr_i[:chr].each_with_index do |c,i|
+        @breakpoints << Breakpoint.new(c, band_i[:bands][i], 'trans')
+      end
+
+
+    end
+
+    :private
+    # :last_chr, :last_band, :abr
+    def recursive_trans_read(*args)
+
+    end
+
+
   end
 
   ## FRAGMENT
@@ -79,12 +127,23 @@ module ChromosomeAberrations
   class ChromosomeGain < Aberration
     @kt = 'gain'
     @rx = /^\+\d+|X|Y$/
+
+    def initialize
+      @abr = str.sub("+", "")
+      @breakpoints = []
+    end
   end
 
   ## CHROMOSOME LOSS
   class ChromosomeLoss < Aberration
     @kt = 'loss'
     @rx = /^-\d+|X|Y$/
+
+    def initialize
+      @abr = str.sub("-", "")
+      @breakpoints = []
+    end
+
   end
 
 

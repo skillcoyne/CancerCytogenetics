@@ -1,13 +1,24 @@
 require 'yaml'
 
 class Aberration
-  attr_reader :breakpoints, :abr
+
+
+  attr_reader :abr, :ab_objs
 
 
   class<<self
-    #attr_accessor :kt, :rx, :test
     @kt = 'unk'
     @rx = /\?/
+
+    def instantiate_aberrations
+      aberration_obj = {}
+      ChromosomeAberrations.constants.each do |ca|
+        abr_obj = ChromosomeAberrations.const_get(ca)
+        aberration_obj[abr_obj.type.to_sym] = abr_obj
+      end
+      return aberration_obj
+    end
+
   end
 
   def self.type
@@ -27,7 +38,12 @@ class Aberration
     return rx
   end
 
-  def self.breakpoint_regex
+  # instantiate these
+  def self.aberration_objs
+    @ab_objs ||= self.instantiate_aberrations
+  end
+
+  def self.aberration_type
     abr_breaks = Aberration.all_regex.keys
     abr_breaks.delete_if { |c| c.to_s.match(/gain|loss/) }
     return abr_breaks
@@ -40,20 +56,43 @@ class Aberration
     return "unknown".to_sym
   end
 
-
-
   def initialize(str)
     @abr = str
+    @breakpoints = []
 
     #regex = Aberration.regex[@type.to_sym]
     # make sure it really is an inversion first
     #raise KaryotypeError, "#{str} does not appear to be a #{self.class}" unless str.match(self.regex)
 
-    @breakpoints = []
-    @breakpoints |= find_breakpoints(str)
+    breakpoints()
+  end
+
+  def breakpoints
+    @breakpoints += get_breakpoints(@abr)
   end
 
 
+  :private
+
+
+  def get_breakpoints(str)
+    bps = []
+    chr_i = find_chr(str)
+    #raise KaryotypeError, "Too many chromosomes #{str}" if chr_i[:chr].length > 1
+
+    band_i = find_bands(str, chr_i[:end_index])
+
+    chr_i[:chr].each_with_index do |c, i|
+      if band_i
+        b = band_i[:bands][i]
+        fragments = find_fragments(b)
+        fragments.each { |f| bps.push(Breakpoint.new(c, f, @type)) }
+      else
+        bps.push(Breakpoint.new(c, "", @type))
+      end
+    end
+    return bps
+  end
 
   # Parsing aberration strings to pull out the chromosome and band definitions
   # These will result in breakpoint information
@@ -86,26 +125,7 @@ class Aberration
 
 # sometimes bands are defined for a single chr as p13q22
   def find_fragments(str)
-    return str.scan(/([p|q]\d+)/).collect {|a| a[0]}
-  end
-
-
-  def find_breakpoints(str)
-    bps = []
-    chr_i = find_chr(str)
-    band_i = find_bands(str, chr_i[:end_index])
-
-    chr_i[:chr].each_with_index do |c, i|
-      if band_i
-        b = band_i[:bands][i]
-        fragments = find_fragments(b)
-        puts fragments
-        fragments.each { |f| bps.push(Breakpoint.new(c, f, @type)) }
-      else
-        bps.push(Breakpoint.new(c, "", @type))
-      end
-    end
-    return bps
+    return str.scan(/([p|q]\d+)/).collect { |a| a[0] }
   end
 
 end

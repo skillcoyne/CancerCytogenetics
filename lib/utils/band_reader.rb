@@ -1,5 +1,6 @@
 module BandReader
 
+
   def self.bands(chr, file)
     bands = self.read_file(file)
     return bands[chr]
