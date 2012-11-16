@@ -1,0 +1,2 @@
+class GenomeStructureError < StandardError
+end

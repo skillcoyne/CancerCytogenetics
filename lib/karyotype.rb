@@ -1,27 +1,27 @@
-require_relative 'utils/karyotype_reader'
-require_relative 'aberration'
-require_relative 'chromosome'
-require_relative 'chromosome_aberrations'
-require_relative 'breakpoint'
-require_relative 'logging'
-
 require 'yaml'
 
+require_relative 'logging'
+require_relative 'genome_structure'
+require_relative 'utils/karyotype_reader'
+
 class Karyotype
+  include GenomeStructure
   include KaryotypeReader
   include Logging
-#  Logging.configure(:class => 'Karyotype')  # doesn't work right now
+
+  Logging.configure(:class => 'Karyotype')  # doesn't work right now
 
   @@haploid = 23
 
-  attr_reader :aberrations, :karyotype, :ploidy, :sex
+  attr_reader :aberrations, :karyotype, :ploidy, :sex, :abnormal_chr, :normal_chr
 
   class<<self
-    attr_accessor :normal_chr, :abnormal_chr, :aberration_objs, :unclear_aberrations
+    attr_accessor :aberration_objs, :unclear_aberrations
   end
 
   def initialize(str)
     raise ArgumentError, "#{str} is not a karyotype." unless str.is_a? String
+    log.info("Reading karyotype #{str}")
 
     @karyotype = str.gsub(/\s/, "")
     @normal_chr = {}; @abnormal_chr = {}; @aberrations = {}; @unclear_aberrations = [];
@@ -35,18 +35,14 @@ class Karyotype
   def analyze
     Aberration.aberration_type.each do |abr_type|
       next unless @aberrations.has_key? abr_type
-      @aberrations[abr_type].each do |abr|
-        chr_i = KaryotypeReader.find_chr(abr)
-        #band_i = KaryotypeReader.find_bands(abr, chr_i[:end_index])
+      regex = @aberration_obj[abr_type].regex
 
-        # just a check
-        #unless chr_i[:chr].length.eql? band_i[:bands].length
-        #  log.error("Bands and chromosomes don't match up: #{abr}. Skipping.")
-        #  next
-        #end
+      @aberrations[abr_type].each do |abr|
+        abr.match(regex)
+        log.warn("Aberration has two chromosomes #{abr} but only the first one is handled.") unless ($2.nil? or $1.eql?$2 )
 
         ## TODO deal with the case of 2 chromosomes defined in the aberration
-        chr = Chromosome.new(chr_i[:chr][0])
+        chr = Chromosome.new($1)
         chr.aberration(@aberration_obj[abr_type].new(abr))
 
         @abnormal_chr[chr.name] = [] unless @abnormal_chr.has_key? chr.name
@@ -65,6 +61,16 @@ class Karyotype
       end
     end
     return bps.flatten!
+  end
+
+  def report_fragments
+    frags = []
+    @abnormal_chr.each_pair do |c, chr_list|
+      chr_list.each do |chr|
+        frags << chr.fragments
+      end
+    end
+    return frags.flatten!
   end
 
   def report_ploidy_change
@@ -101,14 +107,16 @@ class Karyotype
 
 
   def handle_ploidy_diff
+    puts @normal_chr
     @aberrations[:loss].each { |c| @normal_chr[c] -= 1 } if @aberrations[:loss]
-    @aberrations[:gain].each { |c| @normal_chr[c] += 1 } if @aberrations[:gain]
+    @aberrations[:gain].each { |c| puts c; @normal_chr[c] += 1 } if @aberrations[:gain]
   end
 
 # determine ploidy & gender, clean up each aberration and drop any "unknown"
   def prep_karyotype
+    @karyotype.gsub!(/\s/, "")
     clones = @karyotype.scan(/(\[\d+\])/).collect { |a| a[0] }
-    log.warn("Karyotype is a collection of clones, analysis may be inaccurate. #{@karyotype}") if clones.length > 3
+    log.warn("Karyotype is a collection of clones, analysis may be inaccurate.") if clones.length > 3
 
     @karyotype.gsub!(/\[\d+\]/, "") # don't care about numbers of cells: [5]
 
@@ -117,8 +125,8 @@ class Karyotype
     sex_chr = KaryotypeReader.determine_sex(sc)
     @sex = sex_chr.keys.join("")
 
-    (Array(1..23)).each { |c| @normal_chr[c.to_s] = @ploidy }
-    sex_chr.each_pair { |c, p| @normal_chr[c] = p }
+    (Array(1..23)).each { |c| @normal_chr[c.to_s] = @ploidy.to_i }
+    sex_chr.each_pair { |c, p| @normal_chr[c] = p.to_i }
 
     # deal with the most common karyotype string inconsistencies
     cleaned_karyotype = []
@@ -133,7 +141,6 @@ class Karyotype
       @aberrations[abrclass] = [] unless @aberrations.has_key? abrclass
       @aberrations[abrclass] << k.sub(/^(\+|-)?/, "")
     end
-
 
     @aberrations.each_pair do |abrclass, abrlist|
       next if (abrclass.eql? ChromosomeAberrations::ChromosomeGain.type or abrclass.eql? ChromosomeAberrations::ChromosomeLoss.type)

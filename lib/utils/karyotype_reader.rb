@@ -4,8 +4,11 @@ require_relative '../../lib/logging'
 
 module KaryotypeReader
   include Logging
+  #log.progname = 'KaryotypeReader'
 
   def self.cleanup(abr)
+    log.info("#{__method__} #{abr}")
+
     new_abr = []
 
     # +t(13;X)(q13;p12) doesn't need a +
@@ -16,7 +19,6 @@ module KaryotypeReader
       log.warn("Removing aberration with unknown/unclear information: #{abr}")
       return new_abr
     end
-
 
     # 13x2 is normal, 13x3 is a duplicate and should read +13
     if abr.match(/^([\d+|X|Y]+)x(\d+)/)
@@ -42,8 +44,9 @@ module KaryotypeReader
   end
 
   def self.determine_sex(str)
+    log.info("#{__method__} #{str}")
 
-    raise KaryotypeError, "Definition of gender incorrect (#{str})" unless str.match(/X|Y/)
+    raise KaryotypeError, "Definition of gender incorrect (#{str})" unless str.match(/^(X|Y)+$/)
 
     sex_chr = {}
     # ploidy number makes no difference since this string will tell us how many or at least what the gender should be
@@ -61,6 +64,8 @@ module KaryotypeReader
   end
 
   def self.calculate_ploidy(str, haploid)
+    log.info("#{__method__} #{str} #{haploid}")
+
     diploid = haploid*2
     triploid = haploid*3
     quadraploid = haploid*4
@@ -98,37 +103,5 @@ module KaryotypeReader
     return ploidy
   end
 
-  # find chromosome in aberration strings ex. der(19)t(19:2)(q10;q32)
-  def self.find_chr(str)
-    chr_s = str.index(/\(/, 0)
-    chr_e = str.index(/\)/, chr_s)
-    chr = str[chr_s+1..chr_e-1]
-    raise KaryotypeError, "No chromosome parsed from #{str}." unless chr.match(/\d+|X|Y/)
-    return {:start_index => chr_s, :end_index => chr_e, :chr => chr.split(/;|:/)}
-  end
-
-  # find bands in aberration strings ex. der(19)t(19:2)(q10;q32)
-  def self.find_bands(str, index)
-    if str.length.eql?(index+1)
-      log.warn("No bands defined in #{str}")
-      return {:start_index => nil, :end_index => nil, :bands => []}
-    end
-
-    ei = str.index(/\(/, index)
-    if str.match(/(q|p)(\d+|\?)/) and str[ei-1..ei].eql?(")(") # has bands and is not a translocation
-      band_s = str.index(/\(/, index)
-      band_e = str.index(/\)/, band_s)
-      band_e = str.length-1 if band_e.nil?
-
-      bands = str[band_s+1..band_e-1]
-
-      return {:start_index => band_s, :end_index => band_e, :bands => bands.split(/:|;/)}
-    end
-  end
-
-  # sometimes bands are defined for a single chr as p13q22
-  def self.find_fragments(str)
-    return str.scan(/[p|q][\d+][\.\d]/)
-  end
 
 end

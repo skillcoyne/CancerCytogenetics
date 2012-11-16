@@ -1,11 +1,10 @@
 require 'yaml'
 
 class Aberration
-  attr_reader :abr, :ab_objs, :breakpoints
+
+  attr_reader :abr, :ab_objs, :breakpoints, :fragments
 
   class<<self
-    @kt = 'unk'
-    @rx = /\?/
 
     def instantiate_aberrations
       aberration_obj = {}
@@ -49,37 +48,41 @@ class Aberration
     Aberration.all_regex.each_pair do |k, regex|
       return k if abr.match(regex)
     end
-    return "unknown".to_sym
+    return "unk".to_sym
   end
 
   def initialize(str)
+    Logging.configure(:class => self.class.name)
+
     @abr = str
-    @breakpoints = []
+    @breakpoints = []; @fragments = []
 
     #regex = Aberration.regex[@type.to_sym]
     # make sure it really is an inversion first
     #raise KaryotypeError, "#{str} does not appear to be a #{self.class}" unless str.match(self.regex)
-
-    #@breakpoints += get_breakpoints(@abr)
-    get_breakpoints(@abr)
+    get_breakpoints()#(@abr)
     @breakpoints.flatten!
   end
 
+  def to_s
+    "#{@abr}: #{@breakpoints.join(',')}"
+  end
+
   :private
-  def get_breakpoints(str)
-    bps = []
+  def get_breakpoints#(str)
+    str = @abr
     chr_i = find_chr(str)
-    #raise KaryotypeError, "Too many chromosomes #{str}" if chr_i[:chr].length > 1
+    return if chr_i.nil?
 
     band_i = find_bands(str, chr_i[:end_index])
 
     chr_i[:chr].each_with_index do |c, i|
-      if band_i
-        b = band_i[:bands][i]
-        fragments = find_fragments(b)
+      if band_i  # breakpoints aren't added if there is no band information
+        fragments = find_fragments(band_i[:bands][i])
         fragments.each { |f| @breakpoints << Breakpoint.new(c, f, @type) }
       else
-        @breakpoints << Breakpoint.new(c, "", @type)
+        ## No band --> TODO add this as information somewhere but not as a breakpoint
+        #@breakpoints << Breakpoint.new(c, "", @type)
       end
     end
   end
@@ -90,14 +93,17 @@ class Aberration
     chr_s = str.index(/\(/, 0)
     chr_e = str.index(/\)/, chr_s)
     chr = str[chr_s+1..chr_e-1]
-    raise KaryotypeError, "No chromosome parsed from #{str}." unless chr.match(/\d+|X|Y/)
+    unless chr.match(/^\d+|X|Y$/)
+      log.warn("No chromosome defined from #{str}, skipped.")
+      return
+    end
     return {:start_index => chr_s, :end_index => chr_e, :chr => chr.split(/;|:/)}
   end
 
   def find_bands(str, index)
     #raise KaryotypeError, "No bands defined in #{str}" if str.length.eql?(index+1)
     if str.length.eql?(index+1)
-      warn("No bands defined in #{str}")
+      log.warn("No bands defined in #{str}, skipped.")
       return
     end
 
