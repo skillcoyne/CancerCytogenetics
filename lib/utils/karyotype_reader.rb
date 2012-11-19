@@ -7,7 +7,7 @@ module KaryotypeReader
   #log.progname = 'KaryotypeReader'
 
   def self.cleanup(abr)
-    log.info("#{__method__} #{abr}")
+    log.debug("#{__method__} #{abr}")
 
     new_abr = []
 
@@ -44,27 +44,33 @@ module KaryotypeReader
   end
 
   def self.determine_sex(str)
-    log.info("#{__method__} #{str}")
-
-    raise KaryotypeError, "Definition of gender incorrect (#{str})" unless str.match(/^(X|Y)+$/)
-
+    log.debug("#{__method__} #{str}")
     sex_chr = {}
-    # ploidy number makes no difference since this string will tell us how many or at least what the gender should be
     ['X', 'Y'].each { |c| sex_chr[c] = 0 }
 
-    chrs = str.match(/([X|Y]+)/).to_s.split(//)
-    chrs.each { |c| sex_chr[c] +=1 }
+    unless str.match(/^(X|Y)+$/)
+      log.warn("Definition of gender incorrect (#{str})")
+    else
+      #raise KaryotypeError, "Definition of gender incorrect (#{str})" unless str.match(/^(X|Y)+$/)
+      # ploidy number makes no difference since this string will tell us how many or at least what the gender should be
 
+      chrs = str.match(/([X|Y]+)/).to_s.split(//)
+      chrs.each { |c| sex_chr[c] +=1 }
 
-    # assume this was an XY karyotype that may have lost the Y, have only seen this in
-    # severely affected karyotypes
-    sex_chr['Y'] += 1 if (chrs.length.eql?(1) and chrs[0].eql?('X'))
+      # assume this was an XY karyotype that may have lost the Y, have only seen this in
+      # severely affected karyotypes NOT TRUE, some karyotypes are just not defined correctly
+      # often XX -X is listed as X,...  Cannot assume it's a male missing Y
+      #sex_chr['Y'] += 1 if (chrs.length.eql?(1) and chrs[0].eql?('X'))
+    end
 
     return sex_chr
   end
 
   def self.calculate_ploidy(str, haploid)
-    log.info("#{__method__} #{str} #{haploid}")
+    log.debug("#{__method__} #{str} #{haploid}")
+
+    str.sub!(/<.{2,}>/, "")
+    str = $1 if str.match(/\d+\((\d+-\d+)\)/)
 
     diploid = haploid*2
     triploid = haploid*3
@@ -74,13 +80,19 @@ module KaryotypeReader
     ploidy = nil
     min = diploid
     max = diploid
-    if str.match(/<\+(\d)n>/) # sometimes see this odd configuration: 46<+3n>
-      ploidy = $1
-    elsif str.match(/(\d+)-(\d+)/) # num and range or just range: 46-53
+    #if str.match(/<\+(\d)n>/) # sometimes see this odd configuration: 46<+3n>
+    #  ploidy = $1
+    if str.match(/(\d+)[-|~](\d+)/) # num and range or just range: 46-53
       min = $1.to_i; max = $2.to_i
     elsif str.match(/^(\d+)/) # single num:  72
       min = $1.to_i; max = $1.to_i
     end
+
+    if min < haploid
+      log.warn("Ploidy determination may be bad as the min was less than haploid (#{str}). Setting to haploid.")
+      min = haploid
+    end
+
 
     if ploidy.nil?
       case
@@ -93,7 +105,7 @@ module KaryotypeReader
         when (min >= haploid and max < quadraploid)
           log.info("Triploid #{str}")
           ploidy = 3
-        when (min >= diploid and max >= quadraploid)
+        when (max >= quadraploid)
           log.info("Quadraploid #{str}")
           ploidy = 4
         else

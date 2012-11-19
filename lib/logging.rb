@@ -24,8 +24,10 @@ module Logging
   # Global, memoized, lazy initialized instance of a logger
   def self.log
     @log ||= Logger.new(@out)
-    @log.progname = @classname
+    @log.level = Logger::INFO
     @log
+    #@log.progname = @classname
+    #@log
   end
 
 end

@@ -1,6 +1,5 @@
 module BandReader
 
-
   def self.bands(chr, file)
     bands = self.read_file(file)
     return bands[chr]
@@ -11,8 +10,10 @@ module BandReader
     file.each_line do |line|
       line.chomp!
       line.match(/^(\d+|X|Y)([p|q].*)/)
-      band_by_chr[$1] = [] unless band_by_chr.has_key? $1
-      band_by_chr[$1].push($2)
+      c = $1; b = $2
+      band_by_chr[c] = [] unless band_by_chr.has_key? c
+      band_by_chr[c].push(b)
+      band_by_chr[c] = $3 if b.match(/([p|q]\d+)\.\d+/)
     end
     return band_by_chr
   end

@@ -20,7 +20,8 @@ class Karyotype
   end
 
   def initialize(str)
-    raise ArgumentError, "#{str} is not a karyotype." unless str.is_a? String
+    raise ArgumentError, "#{str} is not a karyotype." unless (str.is_a? String and str.length > 1)
+
     log.info("Reading karyotype #{str}")
 
     @karyotype = str.gsub(/\s/, "")
@@ -42,7 +43,7 @@ class Karyotype
         log.warn("Aberration has two chromosomes #{abr} but only the first one is handled.") unless ($2.nil? or $1.eql?$2 )
 
         ## TODO deal with the case of 2 chromosomes defined in the aberration
-        chr = Chromosome.new($1)
+        chr = Chromosome.new($1, true)
         chr.aberration(@aberration_obj[abr_type].new(abr))
 
         @abnormal_chr[chr.name] = [] unless @abnormal_chr.has_key? chr.name
@@ -54,13 +55,15 @@ class Karyotype
 
   # get breakpoints for the karyotype
   def report_breakpoints
-    bps = []
+    bps = Array.new
     @abnormal_chr.each_pair do |c, chr_list|
       chr_list.each do |chr|
         bps << chr.breakpoints
       end
     end
-    return bps.flatten!
+    bps.delete_if { |c| c.empty? }
+    bps.flatten!
+    return bps
   end
 
   def report_fragments
@@ -70,7 +73,9 @@ class Karyotype
         frags << chr.fragments
       end
     end
-    return frags.flatten!
+    frags.delete_if {|c| c.empty?}
+    frags.flatten!
+    return frags
   end
 
   def report_ploidy_change
@@ -83,17 +88,17 @@ class Karyotype
 
 
   def summarize
-    puts "NORMAL CHROMOSOMES:"
+    summary = "NORMAL CHROMOSOMES\n"
     @normal_chr.each_pair do |chr, count|
-      puts "#{chr}: #{count}"
+      summary = "#{summary} #{chr}: #{count}\n"
     end
 
-    puts "ABNORMAL:"
+    summary = "#{summary}\nABNORMAL:"
     @abnormal_chr.each_pair do |chr, list|
-      puts "#{chr}"
+      summary = "#{summary}\n#{chr}"
       list.each do |c|
-        puts c.aberrations
-        puts c.breakpoints
+        summary = "#{summary}\n#{c.aberrations}\n"
+        summary = "#{summary}\n#{c.breakpoints}\n"
       end
     end
   end
@@ -107,9 +112,8 @@ class Karyotype
 
 
   def handle_ploidy_diff
-    puts @normal_chr
     @aberrations[:loss].each { |c| @normal_chr[c] -= 1 } if @aberrations[:loss]
-    @aberrations[:gain].each { |c| puts c; @normal_chr[c] += 1 } if @aberrations[:gain]
+    @aberrations[:gain].each { |c| @normal_chr[c] += 1 } if @aberrations[:gain]
   end
 
 # determine ploidy & gender, clean up each aberration and drop any "unknown"
@@ -123,14 +127,23 @@ class Karyotype
     (pl, sc) = @karyotype.split(",")[0..1]
     @ploidy = KaryotypeReader.calculate_ploidy(pl, @@haploid)
     sex_chr = KaryotypeReader.determine_sex(sc)
-    @sex = sex_chr.keys.join("")
+
+    st = sex_chr.values.inject {|sum,v| sum+v }
+    @sex = nil
+    karyotype_index = 1 # sometimes the sex is not indicated and there's no case information to figure it out
+    if st > 0
+      @sex = sex_chr.keys.join("")
+      karyotype_index = 2
+    end
 
     (Array(1..23)).each { |c| @normal_chr[c.to_s] = @ploidy.to_i }
+
     sex_chr.each_pair { |c, p| @normal_chr[c] = p.to_i }
 
     # deal with the most common karyotype string inconsistencies
     cleaned_karyotype = []
-    @karyotype.split(",")[2..-1].each do |abr|
+
+    @karyotype.split(",")[karyotype_index..-1].each do |abr|
       cleaned_karyotype |= [cleaned_karyotype, KaryotypeReader.cleanup(abr)].flatten
     end
     @karyotype = cleaned_karyotype

@@ -60,7 +60,7 @@ class Aberration
     #regex = Aberration.regex[@type.to_sym]
     # make sure it really is an inversion first
     #raise KaryotypeError, "#{str} does not appear to be a #{self.class}" unless str.match(self.regex)
-    get_breakpoints()#(@abr)
+    get_breakpoints() #(@abr)
     @breakpoints.flatten!
   end
 
@@ -69,21 +69,21 @@ class Aberration
   end
 
   :private
-  def get_breakpoints#(str)
-    str = @abr
-    chr_i = find_chr(str)
+
+  def get_breakpoints
+    chr_i = find_chr(@abr)
     return if chr_i.nil?
 
-    band_i = find_bands(str, chr_i[:end_index])
+    band_i = find_bands(@abr, chr_i[:end_index])
 
-    chr_i[:chr].each_with_index do |c, i|
-      if band_i  # breakpoints aren't added if there is no band information
+    unless band_i.nil? # breakpoints aren't added if there is no band information
+      chr_i[:chr].each_with_index do |c, i|
         fragments = find_fragments(band_i[:bands][i])
         fragments.each { |f| @breakpoints << Breakpoint.new(c, f, @type) }
-      else
-        ## No band --> TODO add this as information somewhere but not as a breakpoint
-        #@breakpoints << Breakpoint.new(c, "", @type)
       end
+    else
+      ## No band --> TODO add this as information somewhere but not as a breakpoint
+      #@breakpoints << Breakpoint.new(c, "", @type)
     end
   end
 
@@ -92,15 +92,18 @@ class Aberration
   def find_chr(str)
     chr_s = str.index(/\(/, 0)
     chr_e = str.index(/\)/, chr_s)
-    chr = str[chr_s+1..chr_e-1]
-    unless chr.match(/^\d+|X|Y$/)
-      log.warn("No chromosome defined from #{str}, skipped.")
-      return
+    chrs = str[chr_s+1..chr_e-1].split(/;|:/)
+    chrs.each do |chr|
+      unless chr.match(/^\d+|X|Y$/)
+        log.warn("No chromosome defined from #{str}, skipped.")
+        return
+      end
     end
-    return {:start_index => chr_s, :end_index => chr_e, :chr => chr.split(/;|:/)}
+    return {:start_index => chr_s, :end_index => chr_e, :chr => chrs}
   end
 
   def find_bands(str, index)
+    band_info = nil
     #raise KaryotypeError, "No bands defined in #{str}" if str.length.eql?(index+1)
     if str.length.eql?(index+1)
       log.warn("No bands defined in #{str}, skipped.")
@@ -112,11 +115,23 @@ class Aberration
       band_s = str.index(/\(/, index)
       band_e = str.index(/\)/, band_s)
       band_e = str.length-1 if band_e.nil?
+      bands = str[band_s+1..band_e-1].split(/;|:/)
 
-      bands = str[band_s+1..band_e-1]
-
-      return {:start_index => band_s, :end_index => band_e, :bands => bands.split(/:|;/)}
+      if str[band_s+1..band_e-1].match(/::/)
+        log.warn("Aberration defined using different language, not currently parsed skipping: #{@abr}")
+        return band_info
+      else
+        bands.map! {|b| b.sub(/-[q|p]\d+$/, "")} # sometimes bands are given a range, for our purposes we'll take the first one (CyDas appears to do this as well)
+        bands.each do |b|
+          unless b.match(/^[p|q]\d+(\.\d)?$/)
+            log.warn("Bands incorrectly defined in #{str}")
+            return band_info
+          end
+        end
+        band_info = {:start_index => band_s, :end_index => band_e, :bands => bands}
+      end
     end
+    return band_info
   end
 
 # sometimes bands are defined for a single chr as p13q22
