@@ -16,4 +16,5 @@ module GenomeStructure
   Breakpoint = ::Breakpoint
   Fragment = ::Fragment
 
+
 end

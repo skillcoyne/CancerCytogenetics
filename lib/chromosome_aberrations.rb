@@ -6,7 +6,6 @@ module ChromosomeAberrations
   class Inversion < Aberration
     @kt = 'inv'
     @rx = /^inv\((\d+|X|Y)\)/
-
   end
 
   ## DUPLICATION
@@ -137,6 +136,7 @@ module ChromosomeAberrations
   class Translocation < Aberration
     @kt = 'trans'
     @rx = /^t\((\d+|X|Y)[;|:](\d+|X|Y)\)/
+
 
 
     ## TWo ways of defining translocations:

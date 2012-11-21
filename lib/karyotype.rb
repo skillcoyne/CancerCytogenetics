@@ -39,6 +39,7 @@ class Karyotype
       regex = @aberration_obj[abr_type].regex
 
       @aberrations[abr_type].each do |abr|
+#        if abr_type
         abr.match(regex)
         log.warn("Aberration has two chromosomes #{abr} but only the first one is handled.") unless ($2.nil? or $1.eql?$2 )
 

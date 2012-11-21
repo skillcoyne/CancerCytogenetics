@@ -7,7 +7,6 @@ module Logging
   @loggers = {}
 
   class << self
-
     def configure(config) # should be a log path, like /tmp/log.txt
       @out = config[:out] if (config[:out] and config[:out] != 'STDOUT')
       @classname = config[:class] if (config[:class])

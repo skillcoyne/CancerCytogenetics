@@ -2,10 +2,10 @@ require 'yaml'
 
 class Aberration
 
-  attr_reader :abr, :ab_objs, :breakpoints, :fragments
+  attr_accessor :breakpoints
+  attr_reader :abr, :ab_objs, :fragments
 
   class<<self
-
     def instantiate_aberrations
       aberration_obj = {}
       ChromosomeAberrations.constants.each do |ca|
@@ -52,8 +52,6 @@ class Aberration
   end
 
   def initialize(str)
-    Logging.configure(:class => self.class.name)
-
     @abr = str
     @breakpoints = []; @fragments = []
 
@@ -62,6 +60,12 @@ class Aberration
     #raise KaryotypeError, "#{str} does not appear to be a #{self.class}" unless str.match(self.regex)
     get_breakpoints() #(@abr)
     @breakpoints.flatten!
+  end
+
+  def remove_breakpoint(bp)
+    removed = @breakpoints.index(bp)
+    @breakpoints.delete_at(removed) if removed
+    return removed
   end
 
   def to_s
@@ -79,7 +83,7 @@ class Aberration
     unless band_i.nil? # breakpoints aren't added if there is no band information
       chr_i[:chr].each_with_index do |c, i|
         fragments = find_fragments(band_i[:bands][i])
-        fragments.each { |f| @breakpoints << Breakpoint.new(c, f, @type) }
+        fragments.each { |f| @breakpoints << Breakpoint.new(c, f, self.class.type) }
       end
     else
       ## No band --> TODO add this as information somewhere but not as a breakpoint

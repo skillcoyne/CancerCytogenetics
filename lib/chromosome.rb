@@ -18,8 +18,7 @@ class Chromosome
     raise ArgumentError, "#{chr} is not a valid chromosome identifier." unless (chr.is_a? String and chr.match(/^\d+|X|Y$/))
     @name = chr
     @aberrations = []
-    ## TODO do something with the bands
-    load_bands() if (args.length > 1 and args[1].eql? true)
+    @normal_bands = bands(@name, "/Users/sarah.killcoyne/workspace/CancerCytogenetics/resources/HsBands.txt") if (args.length > 1 and args[1].eql? true) ## TODO quit hardcoding
   end
 
   def to_s
@@ -29,16 +28,23 @@ class Chromosome
   def aberration(obj)
     raise ArgumentError, "Not an Aberration object" unless obj.is_a? Aberration
 
-    obj.breakpoints.delete_if {|bp|
-      @normal_bands.index(bp.to_s).nil?
-      log.warn("Band #{bp.to_s} doesn't exist. Removing.")
-    }
+    #obj.breakpoints.each do |bp|
+    #  log.warn("Band #{bp.to_s} doesn't exist. Removing.") if @normal_bands.index(bp.to_s).nil?
+    #end
+
+    ## TODO Deal with bands, HOWEVER because the chromosome has aberration objects breakpoints can include
+    ## bands for which no chromosome object is created
+
+    #obj.breakpoints.reject {|bp|
+    #  @normal_bands.index(bp.to_s).nil?
+    #}
+
     @aberrations << obj
   end
 
   def breakpoints
     bps = []
-    @aberrations.each {|a| bps << a.breakpoints }
+    @aberrations.each { |a| bps << a.breakpoints }
     return bps
   end
 
@@ -49,22 +55,5 @@ class Chromosome
     end
     frags
   end
-
-
-  :private
-
-  def load_bands # TODO quit hardcoding
-
-
-
-    @normal_bands = []
-    File.open("/Users/sarah.killcoyne/workspace/CancerCytogenetics/resources/HsBands.txt", 'r').each_line do |line|
-      line.chomp!
-      if line.match(/^#{self.name}/)
-        @normal_bands << line
-      end
-    end
-  end
-
 
 end

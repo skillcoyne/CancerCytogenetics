@@ -2,7 +2,6 @@ require 'yaml'
 require 'date'
 
 require_relative 'lib/karyotype'
-
 require_relative 'lib/logging'
 include Logging
 
@@ -18,9 +17,8 @@ def write_breakpoints(file, breakpoints)
   end
 end
 
-
 ## NCBI SKY-FISH
-def ncbi_skyfish(*args)
+def ncbi_skyfish(args)
   bpf = args[:bpf]; fragf = args[:fragf]; dir = args[:dir]
 
   esidir = "#{dir}/ESI/karyotype"
@@ -63,8 +61,6 @@ def mitelman(args)
   File.open("#{dir}/mm-karyotypes.txt", 'r').each_with_index do |line, i|
     line.chomp!
     next if line.start_with? "#"
-    #next unless i == 14652
-
     puts "Reading  Mitelman karyotype # #{i}"
     log.info("Reading  Mitelman karyotype # #{i}: #{dir}/mm-karyotypes.txt")
     begin
@@ -81,7 +77,7 @@ def mitelman(args)
   end
 end
 
-def cam_tissues(*args)
+def cam_tissues(args)
   bpf = args[:bpf]; fragf = args[:fragf]; dir = args[:dir]
 
   ## Cambridge
@@ -119,24 +115,25 @@ def cam_tissues(*args)
   end
 end
 
+
 ##### ------ MAIN ------ ####
 dir = "/Users/sarah.killcoyne/Data/sky-cgh"
 
-Logging.configure(:out => "#{dir}/karyotype-parse-errors.txt")
+time = Time.new
+date = "#{time.day}#{time.month}#{time.year}"
+
+Logging.configure(:out => "#{dir}/karyotype-parse-errors.#{date}.txt")
 log.datetime_format = "%M"
 
-bpf = File.open("#{dir}/breakpoints.txt", 'w')
+bpf = File.open("#{dir}/breakpoints.#{date}.txt", '2')
 bpf.write("Event\tBreakpoint\tChr\n")
 
-fragf = File.open("#{dir}/fragments.txt", 'w')
+fragf = File.open("#{dir}/fragments.#{date}.txt", '2')
 fragf.write("Chr\tFrom\tTo\n")
 
 
 args = {:bpf => bpf, :fragf => fragf, :dir => dir}
-
-#ncbi_skyfish(args)
-
+ncbi_skyfish(args)
 mitelman(args)
-
-#cam_tissues(args)
+cam_tissues(args)
 
