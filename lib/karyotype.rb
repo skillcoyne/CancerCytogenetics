@@ -67,6 +67,13 @@ class Karyotype
     return bps
   end
 
+  #def report_ploidy_change
+  #  ploidy_report = {}
+  #  @normal_chr.each_pair {|chr, count| ploidy_report[chr] = count-2 if count > 2 }
+  #  return ploidy_report
+  #end
+
+
   def report_fragments
     frags = []
     @abnormal_chr.each_pair do |c, chr_list|
@@ -83,7 +90,8 @@ class Karyotype
     pd = []
     pd << @aberrations[:loss].map {|e| "-#{e}" } if @aberrations[:loss]
     pd << @aberrations[:gain].map {|e| "+#{e}" } if @aberrations[:gain]
-    return pd.flatten!
+    pd.flatten!
+    return pd
   end
 
 
