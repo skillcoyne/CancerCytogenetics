@@ -1,5 +1,6 @@
 require 'yaml'
 require 'date'
+require 'fileutils'
 
 require_relative 'lib/karyotype'
 require_relative 'lib/logging'
@@ -59,13 +60,14 @@ end
 def mitelman(dir, args)
   bpf = args[:bpf]; fragf = args[:fragf]; pf = args[:pf]
 
-  File.open("#{dir}/mm-kary-cancer.txt", 'r').each_with_index do |line, i|
+  File.open("#{dir}/mitelman/mm-kary_cleaned.txt", 'r').each_with_index do |line, i|
     line.chomp!
     next if line.start_with? "#"
+
     puts "Reading  Mitelman karyotype # #{i}"
     log.info("Reading  Mitelman karyotype # #{i}: #{dir}/mm-karyotypes.txt")
     begin
-      (karyotype, morph, shortmorph) = line.split(/\t/)
+      (karyotype, morph, shortmorph, refno, caseno) = line.split(/\t/)
       kt = Karyotype.new(karyotype)
       write_breakpoints(bpf, kt.report_breakpoints, morph)
       write_fragments(fragf, kt.report_fragments, morph)
@@ -117,20 +119,26 @@ dir = "/Users/sarah.killcoyne/Data/sky-cgh"
 time = Time.new
 date = "#{time.day}#{time.month}#{time.year}"
 
-Logging.configure(:out => "#{dir}/karyotype-parse-errors.#{date}.txt")
+outdir = "#{dir}/output/#{date}"
+logdir = "#{dir}/logs/#{date}"
+
+FileUtils.mkpath(outdir)
+FileUtils.mkpath(logdir)
+
+
+Logging.configure(:out => "#{logdir}/karyotype-parse-errors.txt")
 log.datetime_format = "%M"
 
 comment = "## Includes mitelman/ncbi/cam karyotypes\n"
-
-bpf = File.open("#{dir}/breakpoints.#{date}.txt", 'w')
+bpf = File.open("#{outdir}/breakpoints.txt", 'w')
 bpf.write(comment)
 bpf.write("Event\tBreakpoint\tChr\tCancer\n")
 
-fragf = File.open("#{dir}/fragments.#{date}.txt", 'w')
+fragf = File.open("#{outdir}/fragments.txt", 'w')
 fragf.write(comment)
 fragf.write("Chr\tStart\tEnd\tCancer\n")
 
-pf = File.open("#{dir}/ploidy.#{date}.txt", 'w')
+pf = File.open("#{outdir}/ploidy.txt", 'w')
 pf.write(comment)
 pf.write("Change\tCancer\n")
 

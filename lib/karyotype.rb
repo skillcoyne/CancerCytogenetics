@@ -21,7 +21,6 @@ class Karyotype
 
   def initialize(str)
     raise ArgumentError, "#{str} is not a karyotype." unless (str.is_a? String and str.length > 1)
-
     log.info("Reading karyotype #{str}")
 
     @karyotype = str.gsub(/\s/, "")

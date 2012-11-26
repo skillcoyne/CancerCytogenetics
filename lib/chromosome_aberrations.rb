@@ -137,8 +137,6 @@ module ChromosomeAberrations
     @kt = 'trans'
     @rx = /^t\((\d+|X|Y)[;|:](\d+|X|Y)\)/
 
-
-
     ## TWo ways of defining translocations:
     ## 1)  t(1;3)(p31;p13)
     def get_breakpoints
