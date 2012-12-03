@@ -2,9 +2,15 @@ require 'yaml'
 require 'date'
 require 'fileutils'
 
-require_relative 'lib/karyotype'
-require_relative 'lib/logging'
-include Logging
+require 'cytogenetics'
+require 'logger'
+
+
+def write_aberrations(file, aber, cancer, source)
+  aber.each do |abr|
+    file.write("#{abr}\t#{cancer}\t#{source}\n")
+  end
+end
 
 def write_fragments(file, fragments, cancer)
   fragments.each do |f|
@@ -24,8 +30,6 @@ end
 
 ## NCBI SKY-FISH
 def ncbi_skyfish(dir, args)
-  bpf = args[:bpf]; fragf = args[:fragf]; pf = args[:pf]
-
   esidir = "#{dir}/ESI/karyotype"
   Dir.foreach(esidir) do |entry|
     file = "#{esidir}/#{entry}"
@@ -40,16 +44,17 @@ def ncbi_skyfish(dir, args)
 
       (kcase, diag, stage, karyotypes) = line.split("\t")
       next if kcase.match(/mouse/)
-      log.info("Reading #{file} karyotype #{i}")
+      $LOG.info("Reading #{file} karyotype #{i}")
 
       karyotypes.split(/\//).each do |karyotype|
         begin
-          kt = Karyotype.new(karyotype)
-          write_breakpoints(bpf, kt.report_breakpoints, diag)
-          write_fragments(fragf, kt.report_fragments, diag)
-          write_ploidy(pf, kt.report_ploidy_change, diag)
-        rescue GenomeStructureError => gse
-          log.info("#{gse.message}: #{entry}")
+          kt = Cytogenetics.karyotype(karyotype)
+          write_breakpoints(args[:bpf], kt.report_breakpoints, diag)
+          write_fragments(args[:fragf], kt.report_fragments, diag)
+          write_ploidy(args[:pf], kt.report_ploidy_change, diag)
+          write_aberrations(args[:abr], kt.karyotype, diag, "ncbi")
+        rescue Cytogenetics::StructureError => gse
+          $LOG.info("#{gse.message}: #{entry}")
         end
       end
     end
@@ -58,29 +63,26 @@ end
 
 ## Mitelman karyotypes
 def mitelman(dir, args)
-  bpf = args[:bpf]; fragf = args[:fragf]; pf = args[:pf]
-
   File.open("#{dir}/mitelman/mm-kary_cleaned.txt", 'r').each_with_index do |line, i|
     line.chomp!
     next if line.start_with? "#"
 
     puts "Reading  Mitelman karyotype # #{i}"
-    log.info("Reading  Mitelman karyotype # #{i}: #{dir}/mm-karyotypes.txt")
+    $LOG.info("Reading  Mitelman karyotype # #{i}: #{dir}/mm-karyotypes.txt")
+    (karyotype, morph, shortmorph, refno, caseno) = line.split(/\t/)
     begin
-      (karyotype, morph, shortmorph, refno, caseno) = line.split(/\t/)
-      kt = Karyotype.new(karyotype)
-      write_breakpoints(bpf, kt.report_breakpoints, morph)
-      write_fragments(fragf, kt.report_fragments, morph)
-      write_ploidy(pf, kt.report_ploidy_change, morph)
-    rescue GenomeStructureError => gse
-      log.info("#{gse.message}: Mitelman line #{i}")
+      kt = Cytogenetics.karyotype(karyotype)
+      write_breakpoints(args[:bpf], kt.report_breakpoints, morph)
+      write_fragments(args[:fragf], kt.report_fragments, morph)
+      write_ploidy(args[:pf], kt.report_ploidy_change, morph)
+      write_aberrations(args[:abr], kt.karyotype, morph, "mitelman")
+    rescue Cytogenetics::StructureError => gse
+      $LOG.info("#{gse.message}: Mitelman line #{i}")
     end
   end
 end
 
 def cam_tissues(dir, args)
-  bpf = args[:bpf]; fragf = args[:fragf]; pf = args[:pf]
-
   ## Cambridge
   camdir = "#{dir}/path.cam.ac.uk"
 
@@ -94,18 +96,19 @@ def cam_tissues(dir, args)
       file = "#{camdir}/#{tissuedir}/#{entry}"
 
       puts "Reading #{file}..."
-      log.info("Reading #{file}")
+      $LOG.info("Reading #{file}")
       File.open(file, 'r').each_line do |karyotype|
         karyotype.chomp!
         next if karyotype.length <= 1
 
         begin
-          kt = Karyotype.new(karyotype)
-          write_breakpoints(bpf, kt.report_breakpoints, tissuedir)
-          write_fragments(fragf, kt.report_fragments, tissuedir)
-          write_ploidy(pf, kt.report_ploidy_change, tissuedir)
-        rescue GenomeStructureError => gse
-          log.info("#{gse.message}: #{file}")
+          kt = Cytogenetics.karyotype(karyotype)
+          write_breakpoints(args[:bpf], kt.report_breakpoints, tissuedir)
+          write_fragments(args[:fragf], kt.report_fragments, tissuedir)
+          write_ploidy(args[:pf], kt.report_ploidy_change, tissuedir)
+          write_aberrations(args[:abr], kt.karyotype, tissuedir, "cambridge")
+        rescue Cytogenetics::StructureError => gse
+          $LOG.info("#{gse.message}: #{file}")
         end
       end
     end
@@ -125,9 +128,10 @@ logdir = "#{dir}/logs/#{date}"
 FileUtils.mkpath(outdir)
 FileUtils.mkpath(logdir)
 
-
-Logging.configure(:out => "#{logdir}/karyotype-parse-errors.txt")
-log.datetime_format = "%M"
+$LOG = Logger.new("#{logdir}/karyotype-parse-errors.txt")
+$LOG.datetime_format = "%M"
+$LOG.level = Logger::INFO
+Cytogenetics.logger = $LOG
 
 comment = "## Includes mitelman/ncbi/cam karyotypes\n"
 bpf = File.open("#{outdir}/breakpoints.txt", 'w')
@@ -142,7 +146,11 @@ pf = File.open("#{outdir}/ploidy.txt", 'w')
 pf.write(comment)
 pf.write("Change\tCancer\n")
 
-files = {:bpf => bpf, :fragf => fragf, :pf => pf}
+abr = File.open("#{outdir}/aberrations.txt", 'w')
+abr.write(comment)
+abr.write("Aberration\tCancer\tSource\n")
+
+files = {:bpf => bpf, :fragf => fragf, :pf => pf, :abr => abr}
 
 ## Data readers
 ncbi_skyfish(dir, files)
