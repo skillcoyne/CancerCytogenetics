@@ -7,13 +7,24 @@ chrinfo = chrinfo[ -(nrow(chrinfo)), ]
 bpfreq = table(bp$Breakpoint)
 sorted = sort(bpfreq)
 
-# ignoring X and Y
-chromosome_counts=vector("numeric",22)
-names(chromosome_counts)=1:22
-for(i in 1:22)
-{
-  sum(bp$Chr==i)->chromosome_counts[i]
-}
+cancers = table(bp$Cancer)
+cancers = rownames(cancers)
+
+
+
+cancer_counts=vector("numeric",length(cancers))
+names(cancer_counts) = cancers
+for(i in 1:length(cancers))
+  {
+  c = cancers[i]
+  cancer_counts[i] = sum(bp$Cancer==c)
+  }
+
+## Need to drop everything that is Leukemia as that is overrepresented in this data set
+
+
+
+
 
 dev.new()
 par(mfrow=c(3,1))
