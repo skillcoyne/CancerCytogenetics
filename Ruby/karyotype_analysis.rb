@@ -6,26 +6,59 @@ require 'cytogenetics'
 require 'logger'
 
 
+def translate_cancer(cancer)
+  if $TRANSLATION_TABLE.has_key? cancer
+    return $TRANSLATION_TABLE[cancer]
+  else
+    puts "#{cancer} not found"
+    return cancer
+  end
+end
+
+
+def cancer_name(cancer)
+  cancer.chomp!
+  cancer = cancer.split(",")[0]
+  cancer = 'unknown' if (cancer.nil? or cancer.match(/N\/a|NA|N\/A/) or cancer.eql? "")
+  cancer.downcase!
+  cancer.sub!(/nos .*/, "") if cancer.match(/ nos /)
+  cancer.lstrip!
+  cancer.rstrip!
+  cancer = translate_cancer(cancer)
+  return cancer.capitalize
+end
+
+def quote_str(terms)
+  terms.map! { |e| "\"#{e}\"" }
+  return terms.join("\t")
+end
+
+
 def write_aberrations(file, aber, cancer, source)
   aber.each do |abr|
-    file.write("#{abr}\t#{cancer}\t#{source}\n")
+    str = quote_str([abr, cancer, source])
+    file.write("#{str}\n")
   end
 end
 
 def write_fragments(file, fragments, cancer)
   fragments.each do |f|
-    file.write("#{f.chr}\t#{f.start}\t#{f.end}\t#{cancer}\n")
+    str = quote_str([f.chr, f.start, f.end, cancer])
+    file.write("#{str}\n")
   end
 end
 
 def write_breakpoints(file, breakpoints, cancer)
   breakpoints.each do |bp|
-    file.write("#{bp.type}\t#{bp.to_s}\t#{bp.chr}\t#{cancer}\n")
+    str = quote_str([bp.type, bp.to_s, bp.chr, cancer])
+    file.write("#{str}\n")
   end
 end
 
 def write_ploidy(file, ploidy, cancer)
-  ploidy.each {|e| file.write("#{e}\t#{cancer}\n") }
+  ploidy.each { |e|
+    file.write("#{quote_str([e, cancer])}\n")
+  }
 end
 
 ## NCBI SKY-FISH
@@ -36,13 +69,15 @@ def ncbi_skyfish(dir, args)
     next if entry.start_with?(".")
     next if File.directory?(file)
 
-    puts "Reading #{entry}..."
+#    puts "Reading #{entry}..."
 
     File.open("#{esidir}/#{entry}", 'r').each_with_index do |line, i|
       next if i.eql? 0
       line.chomp!
 
       (kcase, diag, stage, karyotypes) = line.split("\t")
+      diag = cancer_name(diag)
+
       next if kcase.match(/mouse/)
       $LOG.info("Reading #{file} karyotype #{i}")
 
@@ -67,9 +102,11 @@ def mitelman(dir, args)
     line.chomp!
     next if line.start_with? "#"
 
-    puts "Reading  Mitelman karyotype # #{i}"
+#    puts "Reading  Mitelman karyotype # #{i}"
     $LOG.info("Reading  Mitelman karyotype # #{i}: #{dir}/mm-karyotypes.txt")
     (karyotype, morph, shortmorph, refno, caseno) = line.split(/\t/)
+    morph = cancer_name(morph)
+
     begin
       kt = Cytogenetics.karyotype(karyotype)
       write_breakpoints(args[:bpf], kt.report_breakpoints, morph)
@@ -95,7 +132,7 @@ def cam_tissues(dir, args)
       next if entry.eql? "url.txt"
       file = "#{camdir}/#{tissuedir}/#{entry}"
 
-      puts "Reading #{file}..."
+#      puts "Reading #{file}..."
       $LOG.info("Reading #{file}")
       File.open(file, 'r').each_line do |karyotype|
         karyotype.chomp!
@@ -120,7 +157,7 @@ end
 dir = "/Users/sarah.killcoyne/Data/sky-cgh"
 
 time = Time.new
-date = "#{time.day}#{time.month}#{time.year}"
+date = time.strftime("%d%m%Y")
 
 outdir = "#{dir}/output/#{date}"
 logdir = "#{dir}/logs/#{date}"
@@ -132,6 +169,16 @@ $LOG = Logger.new("#{logdir}/karyotype-parse-errors.txt")
 $LOG.datetime_format = "%M"
 $LOG.level = Logger::INFO
 Cytogenetics.logger = $LOG
+
+
+$TRANSLATION_TABLE = {}
+File.open("#{Dir.pwd}/resources/cancers.csv", 'r').each_line do |line|
+  line.chomp!
+  (cancer, translation) = line.split(",")
+  translation = cancer if translation.nil?
+  $TRANSLATION_TABLE[cancer.downcase] = translation.downcase
+end
+
 
 comment = "## Includes mitelman/ncbi/cam karyotypes\n"
 bpf = File.open("#{outdir}/breakpoints.txt", 'w')
