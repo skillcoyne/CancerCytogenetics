@@ -1,1 +1,4 @@
-setwd("~/Data/sky-cgh/output/04012013")
+date = format(Sys.Date(), format="%d%m%Y")
+date = "05012013"
+setwd(paste("~/Data/sky-cgh/output/", date, sep=""))
+getwd()

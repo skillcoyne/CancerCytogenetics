@@ -152,9 +152,18 @@ def cam_tissues(dir, args)
   end
 end
 
+def create_file(name, comment="#\n", columns)
+  file = File.open(name, 'w')
+  file.write(comment)
+  file.write(columns.join("\t"))
+  file.write("\n")
+  return file
+end
 
 ##### ------ MAIN ------ ####
-dir = "/Users/sarah.killcoyne/Data/sky-cgh"
+
+
+dir = "#{Dir.home}/Data/sky-cgh"
 
 time = Time.new
 date = time.strftime("%d%m%Y")
@@ -172,35 +181,31 @@ Cytogenetics.logger = $LOG
 
 
 $TRANSLATION_TABLE = {}
-File.open("#{Dir.pwd}/resources/cancers.csv", 'r').each_line do |line|
+File.open("../resources/cancers.csv", 'r').each_line do |line|
   line.chomp!
   (cancer, translation) = line.split(",")
   translation = cancer if translation.nil?
   $TRANSLATION_TABLE[cancer.downcase] = translation.downcase
 end
 
-
-comment = "## Includes mitelman/ncbi/cam karyotypes\n"
-bpf = File.open("#{outdir}/breakpoints.txt", 'w')
-bpf.write(comment)
-bpf.write("Event\tBreakpoint\tChr\tCancer\n")
-
-fragf = File.open("#{outdir}/fragments.txt", 'w')
-fragf.write(comment)
-fragf.write("Chr\tStart\tEnd\tCancer\n")
-
-pf = File.open("#{outdir}/ploidy.txt", 'w')
-pf.write(comment)
-pf.write("Change\tCancer\n")
-
-abr = File.open("#{outdir}/aberrations.txt", 'w')
-abr.write(comment)
-abr.write("Aberration\tCancer\tSource\n")
-
-files = {:bpf => bpf, :fragf => fragf, :pf => pf, :abr => abr}
+comment = "## Includes mitelman/ncbi karyotypes\n"
+files = {
+    :bpf => create_file("#{outdir}/breakpoints.txt", comment, ['Event', 'Breakpoint', 'Chr', 'Cancer']),
+    :fragf => create_file("#{outdir}/fragments.txt", comment, ['Chr', 'Start', 'End', 'Cancer']),
+    :pf => create_file("#{outdir}/ploidy.txt", comment, ['Ploidy', 'Cancer']),
+    :abr => create_file("#{outdir}/aberrations.txt", comment, ['Aberration', 'Cancer', 'Source'])
+}
 
 ## Data readers
 ncbi_skyfish(dir, files)
 mitelman(dir, files)
+
+comment = "## cam karyotypes only\n"
+files = {
+    :bpf => create_file("#{outdir}/cam_breakpoints.txt", comment, ['Event', 'Breakpoint', 'Chr', 'Cancer']),
+    :fragf => create_file("#{outdir}/cam_fragments.txt", comment, ['Chr', 'Start', 'End', 'Cancer']),
+    :pf => create_file("#{outdir}/cam_ploidy.txt", comment, ['Ploidy', 'Cancer']),
+    :abr => create_file("#{outdir}/cam_aberrations.txt", comment, ['Aberration', 'Cancer', 'Source'])
+}
 cam_tissues(dir, files)
 
