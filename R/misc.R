@@ -1,11 +1,10 @@
-setwd("/Users/sarah.killcoyne/Data/sky-cgh/output/26112012")
-bp = read.table("breakpoints.txt", sep="\t", comment="#", header=T)
-chrinfo = read.table("../../chromosome_gene_info_2012.txt", sep="\t", row.names=1, header=T)
-# don't need the mtDNA row
-chrinfo = chrinfo[ -(nrow(chrinfo)), ]
+source("R/lib/load_files.R")
+source("R/lib/wd.R")
 
-## Lets ignore subbands (11.1) and just group them by the major band designation (11)
-bp$Breakpoint = sub("\\.[0-9]+", "", bp$Breakpoint)
+setDataDirectory(date = NA)
+
+bp = loadBreakpoints("breakpoints.txt")
+chrinfo = loadChromosomeInfo()  
 
 bpfreq = table(bp$Breakpoint)
 sorted = sort(bpfreq)

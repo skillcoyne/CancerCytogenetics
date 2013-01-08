@@ -1,11 +1,8 @@
-bp = read.table("breakpoints.txt", sep="\t", comment="#", header=T)
+source("R/lib/load_files.R")
+source("R/lib/wd.R")
 
-## Lets ignore subbands (11.1) and just group them by the major band designation (11)
-bp$Breakpoint = sub("\\.[0-9]+", "", bp$Breakpoint)
-
-
-bpfreq = table(bp$Breakpoint)
-sorted = sort(bpfreq)
+setDataDirectory()
+bp = loadBreakpoints("breakpoints.txt")
 
 cancers = table(bp$Cancer)
 cancers = rownames(cancers)
@@ -17,10 +14,7 @@ for(i in 1:length(cancers))
   c = cancers[i]
   cancer_counts[i] = sum(bp$Cancer==c)
   }
-cancer_counts = log(cancer_counts)
-
-# Not super useful
-plot(hclust(dist(cancer_counts)))
+#cancer_counts = log(cancer_counts)
 
 
 # This probably is not useful since I have classified the cancers in the dataset.
@@ -36,25 +30,29 @@ cor.test(cancer_counts,c(1:length(cancers)))
 
 # Perhaps more interested to look at which events correlate to which cancers?
 
-# drop low frequence breakpoints first (just for computational purposes)
+# drop low frequence breakpoints first as there are a fair number of low frequency 
 bp_freq = log(table(bp$Breakpoint))
-bph = bp[bp$Breakpoint %in% names(bp_freq),]  
-nrow(bph)
+# take all those above one standard dev, this drops about 200 breakpoints
+bp_freq = bp_freq[ which(bp_freq > mean(bp_freq)) ] 
+nrow(bp)
+bp = bp[bp$Breakpoint %in% names(bp_freq),]  
+nrow(bp) 
 
-
+# > 1std drops about 600 observations from 151k
+# > mean drops about 1k
 
 c_vs_bp = table(bp$Cancer, bp$Breakpoint)
 c_vs_bp = t(c_vs_bp) # cancer names as the columns
 
 for (cancer in colnames(c_vs_bp))
   {
-  print(c_vs_bp[,cancer])
+#  cancer_table = c_vs_bp[c_vs_bp[,cancer] > 0, cancer]
+#  plot(cancer_table)
+#  print(cancer_table)
   print (cancer)
-  
-  cancer_table = c_vs_bp[,cancer]
-  #cancer_table = cancer_table[cancer_table > 0]
-  print(cancer_table)
+  print(sum(c_vs_bp[,cancer])) 
   break
   }
+
 
 

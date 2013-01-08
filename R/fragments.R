@@ -1,21 +1,15 @@
-setwd("/Users/sarah.killcoyne/Data/sky-cgh/output/26112012")
-## Fragments ##
-fg = read.table("fragments.txt", header=T, sep="\t")
-fg = fg[order(fg$Chr),]
+source("R/lib/load_files.R")
+source("R/lib/wd.R")
 
-# Not using sex chromosomes generally, 
-fg=fg[which(fg$Chr!="X" & fg$Chr!="Y"),]
+setDataDirectory(date = NA)
 
-## Lets ignore subbands (11.1) and just group them by the major band designation (11)
-fg$Start = sub("\\.[0-9]+", "", fg$Start)
-fg$End = sub("\\.[0-9]+", "", fg$End)
+fg = loadFragments("fragments.txt")
 
 freq=table(fg$Chr)
 
 # filter these out
 for (i in 1:22)
 	{
-	
 	print(i)
 	print(nrow(fg$Chr==i))
 	# p arm

@@ -7,8 +7,8 @@ require 'logger'
 
 
 def translate_cancer(cancer)
-  if $TRANSLATION_TABLE.has_key? cancer
-    return $TRANSLATION_TABLE[cancer]
+  if $CANCER_TRANSLATION.has_key? cancer
+    return $CANCER_TRANSLATION[cancer]
   else
     puts "#{cancer} not found"
     return cancer
@@ -36,7 +36,7 @@ end
 
 def write_aberrations(file, aber, cancer, source)
   aber.each do |abr|
-    str = quote_str([abr, cancer, source])
+    str = quote_str([abr, Cytogenetics.classify_aberration(abr), cancer, source])
     file.write("#{str}\n")
   end
 end
@@ -63,6 +63,7 @@ end
 
 ## NCBI SKY-FISH
 def ncbi_skyfish(dir, args)
+  count = 0
   esidir = "#{dir}/ESI/karyotype"
   Dir.foreach(esidir) do |entry|
     file = "#{esidir}/#{entry}"
@@ -88,16 +89,19 @@ def ncbi_skyfish(dir, args)
           write_fragments(args[:fragf], kt.report_fragments, diag)
           write_ploidy(args[:pf], kt.report_ploidy_change, diag)
           write_aberrations(args[:abr], kt.karyotype, diag, "ncbi")
+          count += 1
         rescue Cytogenetics::StructureError => gse
           $LOG.info("#{gse.message}: #{entry}")
         end
       end
     end
   end
+  count
 end
 
 ## Mitelman karyotypes
 def mitelman(dir, args)
+  count = 0
   File.open("#{dir}/mitelman/mm-kary_cleaned.txt", 'r').each_with_index do |line, i|
     line.chomp!
     next if line.start_with? "#"
@@ -113,16 +117,18 @@ def mitelman(dir, args)
       write_fragments(args[:fragf], kt.report_fragments, morph)
       write_ploidy(args[:pf], kt.report_ploidy_change, morph)
       write_aberrations(args[:abr], kt.karyotype, morph, "mitelman")
+      count += 1
     rescue Cytogenetics::StructureError => gse
       $LOG.info("#{gse.message}: Mitelman line #{i}")
     end
   end
+  count
 end
 
 def cam_tissues(dir, args)
   ## Cambridge
   camdir = "#{dir}/path.cam.ac.uk"
-
+  count = 0
   Dir.foreach(camdir) do |tissuedir|
     next if tissuedir.start_with?(".")
     next unless File.directory? "#{camdir}/#{tissuedir}"
@@ -144,12 +150,14 @@ def cam_tissues(dir, args)
           write_fragments(args[:fragf], kt.report_fragments, tissuedir)
           write_ploidy(args[:pf], kt.report_ploidy_change, tissuedir)
           write_aberrations(args[:abr], kt.karyotype, tissuedir, "cambridge")
+          count += 1
         rescue Cytogenetics::StructureError => gse
           $LOG.info("#{gse.message}: #{file}")
         end
       end
     end
   end
+  count
 end
 
 def create_file(name, comment="#\n", columns)
@@ -171,6 +179,7 @@ date = time.strftime("%d%m%Y")
 outdir = "#{dir}/output/#{date}"
 logdir = "#{dir}/logs/#{date}"
 
+
 FileUtils.mkpath(outdir)
 FileUtils.mkpath(logdir)
 
@@ -180,25 +189,25 @@ $LOG.level = Logger::INFO
 Cytogenetics.logger = $LOG
 
 
-$TRANSLATION_TABLE = {}
-File.open("../resources/cancers.csv", 'r').each_line do |line|
+$CANCER_TRANSLATION = {}
+File.open("resources/cancers.csv", 'r').each_line do |line|
   line.chomp!
   (cancer, translation) = line.split(",")
   translation = cancer if translation.nil?
-  $TRANSLATION_TABLE[cancer.downcase] = translation.downcase
+  $CANCER_TRANSLATION[cancer.downcase] = translation.downcase
 end
 
-comment = "## Includes mitelman/ncbi karyotypes\n"
+comment = "## Includes mitelman/ncbi/cam karyotypes\n"
 files = {
     :bpf => create_file("#{outdir}/breakpoints.txt", comment, ['Event', 'Breakpoint', 'Chr', 'Cancer']),
     :fragf => create_file("#{outdir}/fragments.txt", comment, ['Chr', 'Start', 'End', 'Cancer']),
     :pf => create_file("#{outdir}/ploidy.txt", comment, ['Ploidy', 'Cancer']),
-    :abr => create_file("#{outdir}/aberrations.txt", comment, ['Aberration', 'Cancer', 'Source'])
+    :abr => create_file("#{outdir}/aberrations.txt", comment, ['Aberration', 'Class', 'Cancer', 'Source'])
 }
 
 ## Data readers
-ncbi_skyfish(dir, files)
-mitelman(dir, files)
+total = ncbi_skyfish(dir, files)
+total += mitelman(dir, files)
 
 comment = "## cam karyotypes only\n"
 files = {
@@ -207,5 +216,6 @@ files = {
     :pf => create_file("#{outdir}/cam_ploidy.txt", comment, ['Ploidy', 'Cancer']),
     :abr => create_file("#{outdir}/cam_aberrations.txt", comment, ['Aberration', 'Cancer', 'Source'])
 }
-cam_tissues(dir, files)
+total += cam_tissues(dir, files)
 
+print "#{total} karyotypes."
