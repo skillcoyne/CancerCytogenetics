@@ -1,9 +1,10 @@
+source("R/lib/load_files.R")
+source("R/lib/wd.R")
 
-bp = read.table("breakpoints.txt", sep="\t", comment="#", header=T)
-chrinfo = read.table("../../chromosome_gene_info_2012.txt", sep="\t", row.names=1, header=T)
+setDataDirectory(date = NA)
 
-# don't need the mtDNA row
-chrinfo = chrinfo[ -(nrow(chrinfo)), ]
+bp = loadBreakpoints("breakpoints.txt")
+chrinfo = loadChromosomeInfo()  
 
 bpfreq = table(bp$Breakpoint)
 sorted = sort(bpfreq)
@@ -46,7 +47,7 @@ cor.test(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"])
 
 #although this is being drived by chromosome "1", which means we will have to think about how to normalise the score a bit more
 dev.new()
-plot(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"], type="n")
+plot(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"], type="n", xlab="Chromosome Counts adjusted for length", ylab="Protein Counts")
 text(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"],labels=names(adjusted_scores))
 
 #anyway now as we wanna be clever we can map it to a probability distribution -first we check to see if adjusted_scores are normal
@@ -56,7 +57,7 @@ ks.test(adjusted_scores,pnorm,mean(adjusted_scores),sd(adjusted_scores))
 probability_list=pnorm(adjusted_scores,mean(adjusted_scores),sd(adjusted_scores))
 dev.new()
 #and now a (vaguely) pretty pic just for ewe
-plot(function(x) dnorm(x,mean(adjusted_scores),sd(adjusted_scores)), min(adjusted_scores)-sd(adjusted_scores)*1,max(adjusted_scores)+sd(adjusted_scores)*1,ylab="Density",xlab="Instability Score")
+plot(function(x) dnorm(x,mean(adjusted_scores),sd(adjusted_scores)), min(adjusted_scores)-sd(adjusted_scores)*1,max(adjusted_scores)+sd(adjusted_scores)*1,ylab="Density",xlab="Chromosome Instability Score")
 xpos=vector("numeric",2)
 ypos=vector("numeric",2)
 ypos[1]=0
@@ -67,7 +68,7 @@ for(i in 1:length(adjusted_scores))
 	xpos[2]=adjusted_scores[i]
 	ypos[2]=density_pos[i]
 	lines(xpos,ypos)
-	text(xpos[2],ypos[2],labels=i)
+	text(xpos[2],ypos[2],labels=i,pos=3)
 	}
 
 
@@ -113,7 +114,13 @@ chrinfo[names(instability_score[exclude_nineteen]),"Confirmed.proteins"]/chrinfo
 
 #so- what next...
 dev.new()
+
 plot(hclust(dist(chromosome_counts)))
 plot(hclust(dist(adjusted_scores)))
-plot(hclust(dist(instability_score)))
+
+ins_fit = hclust(dist(instability_score))
+groups = cutree(ins_fit, k=3)
+plot(ins_fit), main="Chromosome Instability")
+rect.hclust(ins_fit, k=3, border=c("red", "blue", "green"))
+
 

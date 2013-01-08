@@ -1,27 +1,18 @@
 # Script looks at breakpoints within arms. Centromeres are known to be unstable so looking at chromosomal instability 
 # in just the arms could provide a more accurate or interesting view on overall instability.
-#
 
+source("R/load_files.R")
+source("R/wd.R")
 
-# This just gets me a list of bands per chromosome, probably useful
-knownbands=read.table("/Users/sarah.killcoyne/workspace/KaryotypeAnalysis/resources/bands_by_chr.txt", header=T, sep="\t")
-## Ignoring X/Y
-knownbands=knownbands[which(knownbands$Chr!="X" & knownbands$Chr!="Y"),]
+setDataDirectory()
 
-# Actual breakpoints
-basedir="/Users/sarah.killcoyne/Data/sky-cgh"
-bp = read.table(paste(basedir, "/output/26112012/","breakpoints.txt", sep=""), sep="\t", comment="#", header=T)
-## Lets ignore subbands (11.1) and just group them by the major band designation (11)
-bp$Breakpoint = sub("\\.[0-9]+", "", bp$Breakpoint)
-# Not using sex chromosomes generally, 
-bp=bp[which(bp$Chr!="X" & bp$Chr!="Y"),]
-# but here they are if we need them
-bp_sex=bp[which(bp$Chr=="X" | bp$Chr=="Y" )]
+# Load files
+bp = loadBreakpoints("breakpoints.txt")
+chrinfo = loadChromosomeInfo("../../chromosome_gene_info_2012.txt")
 
-# 
-chrinfo = read.table(paste(basedir, "/chromosome_gene_info_2012.txt", sep=""), sep="\t", row.names=1, header=T)
-# don't need the mtDNA row
-chrinfo = chrinfo[ -(nrow(chrinfo)), ]
+# This just gets me a list of bands per chromosome, probably useful, ignoring X/Y
+knownbands = read.table("../../bands_by_chr.txt", header=T, sep="\t")
+knownbands = dropSexChr(knownbands)
 
 # ignoring X and Y
 chromosome_counts=vector("numeric",22)
@@ -47,31 +38,33 @@ centromeres = vector(mode="character")
 for (i in 1:22)
  	{
 	b = 11
-    centromeres = c(centromeres, paste(i, "q", b, sep=""))
-    centromeres = c(centromeres, paste(i, "p", b, sep=""))
+  centromeres = c(centromeres, paste(i, "q", b, sep=""))
+  centromeres = c(centromeres, paste(i, "p", b, sep=""))
 	}
 
 # Centromere
-bpcent=vector("numeric",length(centromeres))
-names(bpcent)=centromeres
-for (i in centromeres)  
+bpcent=vector("numeric", 22)
+#bpcent=vector("numeric",length(centromeres))
+names(bpcent)=1:22
+for (i in 1:22)  
 	{
-	bpcent[i] = sum(bp$Breakpoint == i)
+  p = paste(i,"p", 11, sep="")
+  q = paste(i,"q", 11, sep="")
+  bpcent[i] = sum(bp$Breakpoint == p) + sum(bp$Breakpoint == q)
 	}
-	
 
 `%nin%`=Negate(`%in%`) # cute way to create my own 'not' operator
-# Arm
-knownbands$Counts=0
-bparm = bp[which(bp$Breakpoint %nin% centromeres),]  
-bparm_f=sort(table(bparm$Breakpoint))
-for (name in names(bparm_f))
-	{
-	knownbands[knownbands$Band == name, 'Counts'] = sum(bparm$Breakpoint == name)
-	}
+# drop centromeric bands
+knownbands = knownbands[ knownbands$Band %nin% centromeres, ]
 
+# Sum the breakpoints seen per band
+for (band in knownbands$Band)
+  {
+  knownbands[knownbands$Band == band, 'Counts'] = nrow(bp[bp$Breakpoint == band,])
+  }
 
-# OK so ultimately all that does is let me pick out the bands that aren't centromeric.  I can't find exact numbers on this.  So far what I've read is the estimates of centromere size in base pairs is about 1%
+# OK so ultimately all that does is let me pick out the bands that aren't centromeric.  I can't find exact numbers on this.  
+# So far what I've read is the estimates of centromere size in base pairs is about 1% 
 chrinfo$Base.pairs.arms = floor(chrinfo$Base.pairs-(chrinfo$Base.pairs*.01))
 # so then...
 arm_counts=vector("numeric", 22)
@@ -80,7 +73,8 @@ for(i in 1:22)
 	{
 	arm_counts[i]=sum(knownbands[knownbands$Chr == i, 'Counts'])
 	}
-## aaaand, this suggests no correlation? So would this mean most of the instability is due to the centromeres?
+
+## aaaand, this suggests no correlation? So would this mean most of the instability is due to the centromeres and length so not very good example
 arm_adj_scores=arm_counts/(chrinfo[1:22,"Base.pairs.arms"])
 cor.test(arm_adj_scores[1:22],chrinfo[1:22,"Base.pairs.arms"])
 dev.new()
@@ -88,15 +82,20 @@ plot(arm_adj_scores[1:22],chrinfo[1:22,"Base.pairs.arms"], type="n", main="Chrom
 text(arm_adj_scores[1:22],chrinfo[1:22,"Base.pairs.arms"],labels=names(arm_adj_scores))
 
 
-	
-### TODO should really find another file with information regarding what is encoded for by band 
+## So centromeres don't have protein coding genes so if we compare (the way we did with whole chromosomes) to information encoded in total on just the arms...
+adjusted_scores=arm_counts/(chrinfo[1:22,"Base.pairs.arms"]^(.7))
+cor.test(adjusted_scores[1:22],chrinfo[1:22,"Base.pairs.arms"])
+#and now we can (sorta) say that chromosome instability related directly to the amount of information encoded on that chromosome
+cor.test(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"])
+
 
 # Again look at distribution - it's normal, not sure that I'd expect that to change really
 # Can't be compared to the one from bp-analysis though as that score is calculated based on information content rather than length.  NEED TO FIND THAT
 ks.test(arm_adj_scores,pnorm,mean(arm_adj_scores),sd(arm_adj_scores))
 arm_probability_list=pnorm(arm_adj_scores,mean(arm_adj_scores),sd(arm_adj_scores))
 dev.new()
-plot(function(x) dnorm(x,mean(arm_adj_scores),sd(arm_adj_scores)), min(arm_adj_scores)-sd(arm_adj_scores)*1,max(arm_adj_scores)+sd(arm_adj_scores)*1,ylab="Density",xlab="Instability Score")
+plot(function(x) dnorm(x,mean(arm_adj_scores),sd(arm_adj_scores)), min(arm_adj_scores)-sd(arm_adj_scores)*1,max(arm_adj_scores)+sd(arm_adj_scores)*1,
+     ylab="Density",xlab="Chromosome Arms Instability Score")
 xpos=vector("numeric",2)
 ypos=vector("numeric",2)
 ypos[1]=0
@@ -107,12 +106,16 @@ for(i in 1:length(arm_adj_scores))
 	xpos[2]= arm_adj_scores[i]
 	ypos[2]=density_pos[i]
 	lines(xpos,ypos)
-	text(xpos[2],ypos[2],labels=i)
+	text(xpos[2],ypos[2],labels=i, pos=3)
 	}
 
+instability_score=arm_probability_list
+cor.test(instability_score,chrinfo[1:22,"Confirmed.proteins"])
 
-
-
+ins_fit = hclust(dist(instability_score))
+groups = cutree(ins_fit, k=3)
+plot(ins_fit, main="Chromosome Arm Instability")
+rect.hclust(ins_fit, k=3, border=c("red", "blue", "green"))
 
 
 

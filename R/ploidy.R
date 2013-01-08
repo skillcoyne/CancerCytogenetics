@@ -1,4 +1,9 @@
-setwd("/Users/sarah.killcoyne/Data/sky-cgh/output/26112012")
+source("R/lib/load_files.R")
+source("R/lib/wd.R")
+
+setDataDirectory(date = NA)
+
+bp = loadBreakpoints("breakpoints.txt")
 ## Ploidy changes ##
 pdy = read.table("ploidy.txt", header=T, sep="\t")
 pdy = pdy[order(pdy$Change),]
