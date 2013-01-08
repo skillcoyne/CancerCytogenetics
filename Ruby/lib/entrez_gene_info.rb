@@ -1,6 +1,5 @@
 require 'yaml'
 
-
 class EntrezGeneInfo
 
   attr_reader :tax_id, :gene_id, :official_symbol, :tag, :synonyms, :alt_ids, :chr, :band, :other_bands, :desc, :type, :auth_sym, :auth_full_name, :date
