@@ -1,7 +1,13 @@
 totalKaryotypes<-function()
   {
-  # Found by running the ruby script that parses all the karyotypes
-  return(99792)
+  t = read.table("totals.txt", sep="\t", row.names=1, header=T)
+  return( sum(t$Total) )
+  }
+
+unknowns<-function()
+  {
+  t = read.table("totals.txt", sep="\t", row.names=1, header=T)
+  return( sum(t$Unknown) )
   }
 
 loadBreakpoints<-function(bpfile, use_sex = FALSE, ignore_subbands = TRUE)
@@ -41,11 +47,18 @@ loadFragments<-function(file, use_sex = FALSE, ignore_subbands = TRUE)
   return(fg)
   }
 
-loadChromosomeInfo<-function(chrfile = "../../chromosome_gene_info_2012.txt")
+loadChromosomeInfo<-function(chrfile = "../../genomic_info/chromosome_gene_info_2012.txt")
   {
   chrinfo = read.table(chrfile, sep="\t", row.names=1, header=T)
   # don't need the mtDNA row
   chrinfo = chrinfo[ -(nrow(chrinfo)), ]
+  
+  for (i in 1:nrow(chrinfo))
+    {
+    row = chrinfo[i,]
+    # leave pseudogenes out of it
+    chrinfo[i,'Total.Prot.RNA'] = sum(row$Confirmed.proteins, row$Putative.proteins, row$miRNA, row$rRNA, row$snRNA, row$snoRNA, row$Misc.ncRNA)
+    }
   return(chrinfo)
   }
 

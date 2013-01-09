@@ -6,8 +6,8 @@ setDataDirectory(date = NA)
 bp = loadBreakpoints("breakpoints.txt")
 ## Ploidy changes ##
 pdy = read.table("ploidy.txt", header=T, sep="\t")
-pdy = pdy[order(pdy$Change),]
-pdycnts = table(pdy$Change)
+colpdy = pdy[order(pdy$Ploidy),]
+pdycnts = table(pdy$Ploidy)
 pdycnts = sort(pdycnts)
 dev.new()
 plot(pdycnts, type='h',  xaxt="n")
