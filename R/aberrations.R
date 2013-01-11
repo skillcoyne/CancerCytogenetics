@@ -6,7 +6,7 @@ resetwd()
 source("R/lib/wd.R")
 source("R/lib/load_files.R")
 
-setDataDirectory(date = '09012013')
+setDataDirectory()
 
 total_samples = totalKaryotypes()
 

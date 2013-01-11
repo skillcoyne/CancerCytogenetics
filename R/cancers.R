@@ -1,7 +1,7 @@
 source("R/lib/load_files.R")
 source("R/lib/wd.R")
 
-setDataDirectory(date = '09012013')
+setDataDirectory()
 
 
 bp = loadBreakpoints("breakpoints.txt")

@@ -1,7 +1,7 @@
 source("R/lib/load_files.R")
 source("R/lib/wd.R")
 
-setDataDirectory(date = NA)
+setDataDirectory()
 
 bp = loadBreakpoints("breakpoints.txt")
 chrinfo = loadChromosomeInfo()  

@@ -3,7 +3,7 @@ setDataDirectory<-function(date = NA)
   {
   if(is.na(date))
     {
-    date = format(Sys.Date(), format="%d%m%Y")
+    date = 'current'
     }
   setwd(paste("~/Data/sky-cgh/output/", date, sep=""))
   message(getwd())
