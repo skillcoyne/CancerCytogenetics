@@ -1,13 +1,25 @@
+resetwd()
 source("R/lib/load_files.R")
 source("R/lib/wd.R")
 
-setDataDirectory(date = NA)
+setDataDirectory(date = '09012013')
+`%nin%`=Negate(`%in%`) 
 
 bp = loadBreakpoints("breakpoints.txt")
+nrow(bp)
 chrinfo = loadChromosomeInfo()  
 
+plots = FALSE
+## sample the most frequent leukemia/lymphoma cases 
+sample_leukemia_bps = TRUE
+if (sample_leukemia_bps)
+  {
+  leuks = c('Acute myeloid leukemia', 'Acute lymphoblastic leukemia', "Non-hodgkin's lymphoma", 'Chronic myelogenous leukemia', 'Chronic lymphocytic leukemia')
+  bp = sampleCancers(bp, "Cancer", leuks)
+  }
+
 bpfreq = table(bp$Breakpoint)
-sorted = sort(bpfreq)
+write.table(sort(bpfreq[bpfreq > mean(bpfreq)], decreasing=T), sep="\t", quote=F, file="high-freq-sampled-leukemia.txt")
 
 # ignoring X and Y
 chromosome_counts=vector("numeric",22)
@@ -17,52 +29,20 @@ for(i in 1:22)
 	sum(bp$Chr==i)->chromosome_counts[i]
 	}
 
-
-
-dev.new()
-par(mfrow=c(2,1))
-#shock/horror number of events correlates with length of chromosome
-cor.test(chromosome_counts,chrinfo[1:22, "Base.pairs"])
-plot(chromosome_counts, chrinfo[1:22,"Base.pairs"], type="n")
-text(chromosome_counts, chrinfo[1:22,"Base.pairs"],labels=row.names(chrinfo)[1:22])
-
-#and as length correlates with number of proteins this also correlates- but the score is higher
-cor.test(chromosome_counts,chrinfo[1:22,"Confirmed.proteins"])
-plot(chromosome_counts, chrinfo[1:22,"Confirmed.proteins"], type="n")
-text(chromosome_counts, chrinfo[1:22,"Confirmed.proteins"],labels=row.names(chrinfo)[1:22])
-
-#again length correlates with number of psudeogenes- although this is a very high correlation and so is interesting
-cor.test(chromosome_counts,chrinfo[1:22,"Pseudogenes"])
-plot(chromosome_counts, chrinfo[1:22,"Pseudogenes"], type="n")
-text(chromosome_counts, chrinfo[1:22,"Pseudogenes"],labels=row.names(chrinfo)[1:22])
-
-# just to show that the correlation is still to length
-cor.test(chromosome_counts,chrinfo[1:22,"Total.Prot.RNA"])
-plot(chromosome_counts, chrinfo[1:22,"Total.Prot.RNA"], type="n")
-text(chromosome_counts, chrinfo[1:22,"Total.Prot.RNA"],labels=row.names(chrinfo)[1:22])
-
-
-#problem is that this strong correlation is largely being driven by length of chromosome
-cor.test(chromosome_counts,chrinfo[1:22,"Variations"])
-
 #-- so we adjust the length in a non-linear manner (with a bit of mucking arround found ^.7 gave nearly no correlation) --#
 adjusted_scores=chromosome_counts/(chrinfo[1:22,"Base.pairs"]^(.7))
-
 #and now we don;t have a correlation with length- this is our chromosome instability score
 cor.test(adjusted_scores[1:22],chrinfo[1:22,"Base.pairs"])
 #and now we can (sorta) say that chromosome instability related directly to the amount of information encoded on that chromosome
 cor.test(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"])
-cor.test(adjusted_scores[1:22],chrinfo[1:22,'Total.Prot.RNA'])
 
 
-#although this is being drived by chromosome "1", which means we will have to think about how to normalise the score a bit more
-dev.new()
-plot(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"], type="n", xlab="Chromosome Counts adjusted for length", ylab="Protein Counts")
-text(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"],labels=names(adjusted_scores))
-# Using the summed value spreads some of them out a bit but still driven by 1
-plot(adjusted_scores[1:22],chrinfo[1:22,"Total.Prot.RNA"], type="n", xlab="Chromosome Counts adjusted for length", ylab="Total of all protein/gene/RNA counts")
-text(adjusted_scores[1:22],chrinfo[1:22,"Total.Prot.RNA"],labels=names(adjusted_scores))
-
+if (plots)
+  {
+  #although this is being drived by chromosome "1", which means we will have to think about how to normalise the score a bit more
+  plot(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"], type="n", xlab="Chromosome Counts adjusted for length", ylab="Protein Counts")
+  text(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"],labels=names(adjusted_scores))
+  }
 
 #anyway now as we wanna be clever we can map it to a probability distribution -first we check to see if adjusted_scores are normal
 ks.test(adjusted_scores,pnorm,mean(adjusted_scores),sd(adjusted_scores))
@@ -71,23 +51,24 @@ ks.test(adjusted_scores,pnorm,mean(adjusted_scores),sd(adjusted_scores))
 #they are normal so we generate the proabilities of these scores occuring if they follow the normal dist
 probability_list=pnorm(adjusted_scores,mean(adjusted_scores),sd(adjusted_scores))
 
-dev.new()
-#and now a (vaguely) pretty pic just for ewe
-plot(function(x) dnorm(x,mean(adjusted_scores),sd(adjusted_scores)), min(adjusted_scores)-sd(adjusted_scores)*1,max(adjusted_scores)+sd(adjusted_scores)*1,
+if (plots)
+  {
+  #and now a (vaguely) pretty pic just for ewe
+  plot(function(x) dnorm(x,mean(adjusted_scores),sd(adjusted_scores)), min(adjusted_scores)-sd(adjusted_scores)*1,max(adjusted_scores)+sd(adjusted_scores)*1,
      ylab="Density",xlab="Chromosome Instability Score")
-xpos=vector("numeric",2)
-ypos=vector("numeric",2)
-ypos[1]=0
-density_pos=dnorm(adjusted_scores,mean(adjusted_scores),sd(adjusted_scores))
-for(i in 1:length(adjusted_scores))
-	{
-	xpos[1]=adjusted_scores[i]
-	xpos[2]=adjusted_scores[i]
-	ypos[2]=density_pos[i]
-	lines(xpos,ypos)
-	text(xpos[2],ypos[2],labels=i,pos=3)
-	}
-
+  xpos=vector("numeric",2)
+  ypos=vector("numeric",2)
+  ypos[1]=0
+  density_pos=dnorm(adjusted_scores,mean(adjusted_scores),sd(adjusted_scores))
+  for(i in 1:length(adjusted_scores))
+	  {
+	  xpos[1]=adjusted_scores[i]
+	  xpos[2]=adjusted_scores[i]
+	  ypos[2]=density_pos[i]
+	  lines(xpos,ypos)
+	  text(xpos[2],ypos[2],labels=i,pos=3)
+	  }
+  }
 
 #this just gives us the list of how unusual the score is (stable or instable) -not that useful really
 #one_sided_probability_list=((0.5-probability_list)^2)^.5 *2 
@@ -107,31 +88,24 @@ cor.test(instability_score,chrinfo[1:22,"Total.Prot.RNA"])
 # if we don;t adjust for length we get ok results- fitting to dist doesn't give us much more apart from a pretty pic and soemthing that sounds clever...
 # should be noted that the mapped to dist and normal scores are basically the same (very highly correlated as the scores are basically normally distributed) 
 # but working with probs might be easier
-
-dev.new()
-par(mfrow=c(2,1))
-plot(instability_score,chrinfo[1:22,"Confirmed.proteins"], main="Cancer instability and known protein counts", 
+if (plots)
+  {
+  plot(instability_score,chrinfo[1:22,"Confirmed.proteins"], main="Cancer instability and known protein counts", 
      sub="pearson cor=.31 (pval=0.16)",xlab="Chromosome instability score",ylab="Protein count", type="n")
-text(instability_score,chrinfo[1:22,"Confirmed.proteins"],labels=names(instability_score))
-
-plot(instability_score,chrinfo[1:22,"Total.Prot.RNA"], main="Cancer instability and summed protein/RNA counts", 
-     sub="pearson cor=.31 (pval=0.16)",xlab="Chromosome instability score",ylab="Protein count", type="n")
-text(instability_score,chrinfo[1:22,"Total.Prot.RNA"],labels=names(instability_score))
-
+  text(instability_score,chrinfo[1:22,"Confirmed.proteins"],labels=names(instability_score))
+  #plot(instability_score,chrinfo[1:22,"Total.Prot.RNA"], main="Cancer instability and summed protein/RNA counts",sub="pearson cor=.31 (pval=0.16)",xlab="Chromosome instability score",ylab="Protein count", type="n")
+  #text(instability_score,chrinfo[1:22,"Total.Prot.RNA"],labels=names(instability_score))
+  }
 
 #we can adjust for length
 cor.test(instability_score,chrinfo[1:22,"Confirmed.proteins"]/chrinfo[1:22,"Base.pairs"]^.7)
-plot(instability_score, chrinfo[1:22,"Confirmed.proteins"]/chrinfo[1:22,"Base.pairs"]^.7, 
-main="Cancer instability and known protein counts",
-sub="pearson cor=.31 (pval=0.15)",xlab="Chromosome instability score",ylab="Length normalised protein count", type="n")
-text(instability_score, chrinfo[1:22,"Confirmed.proteins"]/chrinfo[1:22,"Base.pairs"]^.7,labels=names(instability_score))
-
-# so using the summed data still shows 19 as an outlier
-cor.test(instability_score,chrinfo[1:22,"Total.Prot.RNA"]/chrinfo[1:22,"Base.pairs"]^.7)
-plot(instability_score, chrinfo[1:22,"Total.Prot.RNA"]/chrinfo[1:22,"Base.pairs"]^.7, 
-     main="Cancer instability and summed protein/RNA counts",
-     sub="pearson cor=.31 (pval=0.15)",xlab="Chromosome instability score",ylab="Length normalised protein count", type="n")
-text(instability_score, chrinfo[1:22,"Total.Prot.RNA"]/chrinfo[1:22,"Base.pairs"]^.7,labels=names(instability_score))
+if (plots)
+  {
+  plot(instability_score, chrinfo[1:22,"Confirmed.proteins"]/chrinfo[1:22,"Base.pairs"]^.7, 
+      main="Cancer instability and known protein counts",
+      sub="pearson cor=.31 (pval=0.15)",xlab="Chromosome instability score",ylab="Length normalised protein count", type="n")
+  text(instability_score, chrinfo[1:22,"Confirmed.proteins"]/chrinfo[1:22,"Base.pairs"]^.7,labels=names(instability_score))
+  }
 
 
 
@@ -141,11 +115,6 @@ cor.test(instability_score[names(instability_score[exclude_nineteen])],
   chrinfo[names(instability_score[exclude_nineteen]),"Confirmed.proteins"]/chrinfo[names(instability_score[exclude_nineteen]),"Base.pairs"]^.7)
 cor.test(adjusted_scores[names(instability_score[exclude_nineteen])],
   chrinfo[names(instability_score[exclude_nineteen]),"Confirmed.proteins"]/chrinfo[names(instability_score[exclude_nineteen]),"Base.pairs"]^.7)
-
-cor.test(instability_score[names(instability_score[exclude_nineteen])],
-         chrinfo[names(instability_score[exclude_nineteen]),"Total.Prot.RNA"]/chrinfo[names(instability_score[exclude_nineteen]),"Base.pairs"]^.7)
-cor.test(adjusted_scores[names(instability_score[exclude_nineteen])],
-         chrinfo[names(instability_score[exclude_nineteen]),"Total.Prot.RNA"]/chrinfo[names(instability_score[exclude_nineteen]),"Base.pairs"]^.7)
 
 
 
@@ -160,4 +129,5 @@ groups = cutree(ins_fit, k=3)
 plot(ins_fit, main="Chromosome Instability")
 rect.hclust(ins_fit, k=3, border=c("red", "blue", "green"))
 
+sort(groups)
 

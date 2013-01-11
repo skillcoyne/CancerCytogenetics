@@ -1,9 +1,18 @@
-bp = read.table("breakpoints.txt", sep="\t", comment="#", header=T)
+source("R/lib/load_files.R")
+source("R/lib/wd.R")
 
-cancers = table(bp$Cancer)
-
-
-write.table(cancers, row.names=F, col.names=F, quote=F, sep="\t")
-write.table(cancers, file="~/Data/sky-cgh/output/cancers.txt", row.names=F, col.names=F, quote=F, sep="\t")
+setDataDirectory(date = '09012013')
 
 
+bp = loadBreakpoints("breakpoints.txt")
+
+cnc = read.table("cancers.txt", sep="\t", header=T)
+
+
+ncbi = cnc[ which(cnc$Source == 'ncbi'), ]
+cnt = table(ncbi$Cancer)
+
+
+sc = table(cnc$Source, cnc$Cancer)
+
+barplot(sc, col=c("darkblue", "red", "green"))

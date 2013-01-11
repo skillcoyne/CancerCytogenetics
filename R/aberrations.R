@@ -2,10 +2,11 @@
 # frequency analysis.  Due to the inconsistent nature of aberration definition in karyotypes this is a very
 # rough look at aberration frequency. What this show is a high frequency of ploidy aberrations (addition or deletion)
 # of entire chromosomes as well as a few well characterized structural variations.
+resetwd()
 source("R/lib/wd.R")
 source("R/lib/load_files.R")
 
-setDataDirectory(date = NA)
+setDataDirectory(date = '09012013')
 
 total_samples = totalKaryotypes()
 
@@ -15,16 +16,21 @@ abr = abr[abr$Aberration != "r",]
 abr = abr[abr$Aberration != "mar",]
 nrow(abr)
 
-b = "Leiomyoma"
-tmp = abr[abr$Cancer == b,]
-f = table(tmp$Aberration)
-f = f[f > 0]
+sample_leukemia_bps = FALSE
+if (sample_leukemia_bps)
+  {
+  leuks = c('Acute myeloid leukemia', 'Acute lymphoblastic leukemia', "Non-hodgkin's lymphoma", 'Chronic myelogenous leukemia', 'Chronic lymphocytic leukemia')
+  abr = sampleCancers(abr, "Cancer", leuks)
+  }
+
 
 cancer_freq = table(abr$Cancer)
 
 
 abr_freq = table(abr$Aberration)
 abr_freq = abr_freq[abr_freq>0]
+
+
 
 range(abr_freq)
 length(abr_freq)
@@ -34,6 +40,8 @@ abr_freq = abr_freq[abr_freq > 1]
 
 std1 = sd(abr_freq)
 high_freq = abr_freq[abr_freq>mean(abr_freq)+std1]
+
+write.table(sort(high_freq, decreasing = T), sep="\t", quote=F, "aberration-freq-sampled.txt")
 
 sorted_log = sort(log(high_freq), decreasing=T)
 

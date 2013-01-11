@@ -1,36 +1,32 @@
 # Script looks at breakpoints within arms. Centromeres are known to be unstable so looking at chromosomal instability 
 # in just the arms could provide a more accurate or interesting view on overall instability.
+resetwd()
+source("R/lib/load_files.R")
+source("R/lib/wd.R")
 
-source("R/load_files.R")
-source("R/wd.R")
-
-setDataDirectory()
+setDataDirectory(date = '09012013')
 
 # Load files
 bp = loadBreakpoints("breakpoints.txt")
-chrinfo = loadChromosomeInfo("../../chromosome_gene_info_2012.txt")
+nrow(bp)
+chrinfo = loadChromosomeInfo("../../genomic_info/chromosome_gene_info_2012.txt")
 
 # This just gets me a list of bands per chromosome, probably useful, ignoring X/Y
-knownbands = read.table("../../bands_by_chr.txt", header=T, sep="\t")
+knownbands = read.table("../../genomic_info/bands_by_chr.txt", header=T, sep="\t")
 knownbands = dropSexChr(knownbands)
 
-# ignoring X and Y
-chromosome_counts=vector("numeric",22)
-names(chromosome_counts)=1:22
-for(i in 1:22)
-	{
-	chromosome_counts[i]=sum(bp$Chr==i)
-	}
 
-#adjust the length in a non-linear manner
-adjusted_scores=chromosome_counts/(chrinfo[1:22,"Base.pairs"]^(.7))
-#chromosome instability score (not as a function of length)
-cor.test(adjusted_scores[1:22],chrinfo[1:22,"Base.pairs"])  
-# instability is (sorta) related to the proteins encoded by that chromosome (rather than length)
-cor.test(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"])
-#plot(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"], type="n")
-#text(adjusted_scores[1:22],chrinfo[1:22,"Confirmed.proteins"],labels=names(adjusted_scores))
-probability_list=pnorm(adjusted_scores,mean(adjusted_scores),sd(adjusted_scores))
+## sample the most frequent leukemia/lymphoma cases 
+sample_leukemia_bps = FALSE
+if (sample_leukemia_bps)
+  {
+  leuks = c('Acute myeloid leukemia', 'Acute lymphoblastic leukemia', "Non-hodgkin's lymphoma", 'Chronic myelogenous leukemia', 'Chronic lymphocytic leukemia')
+  bp = sampleCancers(bp, "Cancer", leuks)
+  }
+
+bpfreq = table(bp$Breakpoint)
+
+
 
 ## Most of these are driven by breakages at the centromeres.  What happens when we look just at the arms
 ## CENTROMERES ## ignore X,Y
@@ -62,6 +58,9 @@ for (band in knownbands$Band)
   {
   knownbands[knownbands$Band == band, 'Counts'] = nrow(bp[bp$Breakpoint == band,])
   }
+sorted = knownbands[order(-knownbands$Count), ]
+write.table(sorted, quote=F, sep="\t", file="arm-bp-freq.txt")
+
 
 # OK so ultimately all that does is let me pick out the bands that aren't centromeric.  I can't find exact numbers on this.  
 # So far what I've read is the estimates of centromere size in base pairs is about 1% 

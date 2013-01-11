@@ -1,9 +1,18 @@
+resetwd()
 source("R/lib/load_files.R")
 source("R/lib/wd.R")
 
-setDataDirectory(date = NA)
+setDataDirectory(date = '09012013')
 
 fg = loadFragments("fragments.txt")
+
+sample_leukemia_bps = FALSE
+if (sample_leukemia_bps)
+  {
+  leuks = c('Acute myeloid leukemia', 'Acute lymphoblastic leukemia', "Non-hodgkin's lymphoma", 'Chronic myelogenous leukemia', 'Chronic lymphocytic leukemia')
+  fg = sampleCancers(fg, "Cancer", leuks)
+  }
+
 
 freq=table(fg$Chr)
 
