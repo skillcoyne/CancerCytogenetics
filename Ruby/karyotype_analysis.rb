@@ -139,6 +139,41 @@ def mitelman(dir, args)
   $COUNTS.update_element('Mitelman', 'Unknown', unk)
 end
 
+def nci_fcrf(dir, args)
+  count = 0
+  crfdir = "#{dir}/ncifcrf"
+
+  Dir.foreach(crfdir) do |tissuedir|
+    next if tissuedir.start_with?(".")
+    next unless File.directory? "#{crfdir}/#{tissuedir}"
+
+    Dir.foreach("#{crfdir}/#{tissuedir}") do |entry|
+      next if entry.start_with?(".")
+      next if entry.eql? "url.txt"
+      file = "#{crfdir}/#{tissuedir}/#{entry}"
+
+      puts "Reading #{file}"
+      karyotype = File.readlines(file).map! { |e| e.chomp! }
+      karyotype = karyotype.join("")
+
+      begin
+        kt = Cytogenetics.karyotype(karyotype)
+        write_breakpoints(args[:bpf], kt.report_breakpoints, tissuedir)
+        write_fragments(args[:fragf], kt.report_fragments, tissuedir)
+        write_ploidy(args[:pf], kt.report_ploidy_change, tissuedir)
+        write_aberrations(args[:abr], kt.karyotype, tissuedir, "ncifcrf")
+        write_cancers(args[:cnc], "ncifcrf", tissuedir)
+        count += 1
+      rescue Cytogenetics::StructureError => gse
+        $LOG.info("#{gse.message}: #{file}")
+      end
+    end
+  end
+  $COUNTS.update_element('FCRF', 'Total', count)
+  $COUNTS.update_element('FCRF', 'Unknown', 0)
+end
+
+
 def cam_tissues(dir, args)
   ## Cambridge
   camdir = "#{dir}/path.cam.ac.uk"
@@ -202,9 +237,8 @@ FileUtils.rm_f("#{dir}/output/current") if File.exists?("#{dir}/output/current")
 FileUtils.symlink(outdir, "#{dir}/output/current")
 
 
-
 $LOG = Logger.new("#{logdir}/karyotype-parse-errors.txt")
-$LOG.datetime_format = "%M"
+#$LOG.datetime_format = "%M"
 $LOG.level = Logger::INFO
 Cytogenetics.logger = $LOG
 
@@ -219,7 +253,7 @@ end
 
 $COUNTS = SimpleMatrix.new
 $COUNTS.colnames = ['Total', 'Unknown']
-$COUNTS.rownames = ['NCBI', 'Mitelman', 'Cambridge']
+$COUNTS.rownames = ['NCBI', 'Mitelman', 'Cambridge', 'FCRF']
 
 comment = "## Includes mitelman/ncbi/cam karyotypes\n"
 files = {
@@ -231,19 +265,10 @@ files = {
 }
 
 ## Data readers
-#  ncbi_skyfish(dir, files)
+ncbi_skyfish(dir, files)
 mitelman(dir, files)
-
-#comment = "## cam karyotypes only\n"
-#files = {
-#    :bpf => create_file("#{outdir}/cam_breakpoints.txt", comment, ['Event', 'Breakpoint', 'Chr', 'Cancer']),
-#    :fragf => create_file("#{outdir}/cam_fragments.txt", comment, ['Chr', 'Start', 'End', 'Cancer']),
-#    :pf => create_file("#{outdir}/cam_ploidy.txt", comment, ['Ploidy', 'Cancer']),
-#    :abr => create_file("#{outdir}/cam_aberrations.txt", comment, ['Aberration', 'Cancer', 'Source'])
-#    :cnc => create_file("#{outdir}/cam_cancers.txt", comment, ['Source', 'Cancer'])
-#}
-#  cam_tissues(dir, files)
-
+cam_tissues(dir, files)
+nci_fcrf(dir, files)
 
 $COUNTS.write("#{outdir}/totals.txt")
 

@@ -98,14 +98,17 @@ if (plots)
   }
 
 #we can adjust for length
-cor.test(instability_score,chrinfo[1:22,"Confirmed.proteins"]/chrinfo[1:22,"Base.pairs"]^.7)
+ins_corr = cor.test(instability_score,chrinfo[1:22,"Confirmed.proteins"]/chrinfo[1:22,"Base.pairs"]^.7)
+corr_str = paste("pearson cor=", round(ins_corr$estimate, 2), "  (pval=", round(ins_corr$p.value, 2), ")", sep="")
 if (plots)
   {
   plot(instability_score, chrinfo[1:22,"Confirmed.proteins"]/chrinfo[1:22,"Base.pairs"]^.7, 
       main="Cancer instability and known protein counts",
-      sub="pearson cor=.31 (pval=0.15)",xlab="Chromosome instability score",ylab="Length normalised protein count", type="n")
+      sub=corr_str,xlab="Chromosome instability score",ylab="Length normalised protein count", type="n")
   text(instability_score, chrinfo[1:22,"Confirmed.proteins"]/chrinfo[1:22,"Base.pairs"]^.7,labels=names(instability_score))
   }
+
+
 
 
 
