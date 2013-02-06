@@ -16,7 +16,6 @@ def translate_cancer(cancer)
   end
 end
 
-
 def cancer_name(cancer)
   cancer.chomp!
   cancer = cancer.split(",")[0]
@@ -112,16 +111,22 @@ end
 
 ## Mitelman karyotypes
 def mitelman(dir, args)
-  count = 0; unk = 0
+  count = 0; unk = 0; lk = 0
   File.open("#{dir}/mitelman/mm-kary_cleaned.txt", 'r').each_with_index do |line, i|
     line.chomp!
     next if line.start_with? "#"
 
-#    puts "Reading  Mitelman karyotype # #{i}"
+    puts "Reading  Mitelman karyotype # #{i}"
     $LOG.info("Reading  Mitelman karyotype # #{i}: #{dir}/mm-karyotypes.txt")
     (karyotype, morph, shortmorph, refno, caseno) = line.split(/\t/)
+
     morph = cancer_name(morph)
     unk += 1 if morph.eql? 'Unknown'
+
+    if morph.downcase.match(/leukemia|myeloma|lymphoma|myelodysplastic/)
+      lk += 1
+      next
+    end
 
     begin
       kt = Cytogenetics.karyotype(karyotype)
@@ -137,6 +142,7 @@ def mitelman(dir, args)
   end
   $COUNTS.update_element('Mitelman', 'Total', count)
   $COUNTS.update_element('Mitelman', 'Unknown', unk)
+  puts "#{lk} leukemia/lymphoma/myeloma"
 end
 
 def nci_fcrf(dir, args)
@@ -250,6 +256,7 @@ File.open("resources/cancers.csv", 'r').each_line do |line|
   translation = cancer if translation.nil?
   $CANCER_TRANSLATION[cancer.downcase] = translation.downcase
 end
+
 
 $COUNTS = SimpleMatrix.new
 $COUNTS.colnames = ['Total', 'Unknown']

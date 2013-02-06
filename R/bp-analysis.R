@@ -9,9 +9,9 @@ bp = loadBreakpoints("breakpoints.txt")
 nrow(bp)
 chrinfo = loadChromosomeInfo()  
 
-plots = FALSE
+plots = TRUE
 ## sample the most frequent leukemia/lymphoma cases 
-sample_leukemia_bps = TRUE
+sample_leukemia_bps = FALSE
 if (sample_leukemia_bps)
   {
   leuks = c('Acute myeloid leukemia', 'Acute lymphoblastic leukemia', "Non-hodgkin's lymphoma", 'Chronic myelogenous leukemia', 'Chronic lymphocytic leukemia')

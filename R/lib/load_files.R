@@ -11,6 +11,14 @@ unknowns<-function()
   return( sum(t$Unknown) )
   }
 
+loadBands<-function(file = "../../genomic_info/chromosome_bands.csv")
+  {
+  t = read.table(file, sep=",", header=T)
+  b = cbind(t$chromosome, t$band, t$start, t$end)
+  b = b[order(b$chromosome),]  
+  return(b)
+  }
+  
 loadBreakpoints<-function(bpfile, use_sex = FALSE, ignore_subbands = TRUE)
   {
   bp = read.table(bpfile, sep="\t", comment="#", header=T)
@@ -28,6 +36,8 @@ loadBreakpoints<-function(bpfile, use_sex = FALSE, ignore_subbands = TRUE)
     }
   return(bp)
   }
+
+
 
 ## if I care enough I can make one function for this stuff...
 loadFragments<-function(file, use_sex = FALSE, ignore_subbands = TRUE)
