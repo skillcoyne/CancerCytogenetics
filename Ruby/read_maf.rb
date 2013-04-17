@@ -2,7 +2,8 @@ require 'yaml'
 require 'find'
 
 
-def get_filehandle(filename, cols = ["Cancer", "Chr", "StartPosition", "EndPosition", "VarClass", "VarType", "NormalAllele1", "NormalAllele2", "TumorAllele1", "TumorAllele2"])
+def get_filehandle(filename,
+    cols = ["Center", "Patient", "Cancer", "Chr", "Start", "End", "VarClass", "VarType"])
   f = File.open(filename, 'w')
   f.write(cols.join("\t") + "\n")
   return f
@@ -29,29 +30,37 @@ maf_files.each do |maf|
   end
 end
 
-
-
-fout = get_filehandle("#{Dir.home}/Data/TCGA/all_variants.txt")
+fh = Hash[Array(1..22).map { |e| [e.to_s, get_filehandle("#{Dir.home}/Data/TCGA/chr#{e}_variants.txt")] }]
+fh['X'] = get_filehandle("#{Dir.home}/Data/TCGA/chrX_variants.txt")
+fh['Y'] = get_filehandle("#{Dir.home}/Data/TCGA/chrY_variants.txt")
 
 maf_by_cancer.each_pair do |cancer, files|
   puts "Reading #{cancer} files..."
-  cout = get_filehandle("#{Dir.home}/Data/TCGA/#{cancer}_variants.txt")
-
   files.each do |file|
+    # WU made calls in regions of the genome that they could not have. There are previously known issues with their sequencing quality so just filtering them out
+    next if file.match(/genome.wustl.edu/)
     puts "\tReading #{file}..."
+
     File.open(file, 'r').each_with_index do |line, i|
       line.chomp!
-      next if line.start_with? "#" or line.start_with? "Hugo"
+      next if line.start_with? "#" or line.start_with? "Hugo" or line.eql? ""
+      #cols = line.split("\t")
+      #cols.each_with_index do |c, i|
+      #  puts "#{i} #{c}"
+      #end
       cols = line.split("\t")
 
-      (build, chr, startpos, endpos, strand, variant_class, variant_type, ref_allele, tumor_a1, tumor_a2) = cols[3..11]
-      (match_norm_a1, match_norm_a2) = cols[17..18]
+      cols.each { |e| raise "ERROR: #{cols.join(' ')}" if e.match(/\t/) }
 
-      output = [cancer, chr, startpos, endpos, variant_class, variant_type, match_norm_a1, match_norm_a2, tumor_a1, tumor_a2]
-      fout.write(output.join("\t") + "\n")
-      cout.write(output.join("\t") + "\n")
+      (center, build, chr, startpos, endpos, strand, variant_class, variant_type) = cols[2..9]
+      patient = cols[15].split("-")[2]
+
+      output = [center, patient, cancer, chr, startpos, endpos, variant_class, variant_type]
+
+      if fh.has_key? chr
+        fh[chr].write(output.join("\t") + "\n")
+      end
     end
   end
-  cout.close
 end
-fout.close
+fh.values.each { |e| e.close }
