@@ -3,7 +3,7 @@ require 'find'
 
 
 def get_filehandle(filename,
-    cols = ["Center", "Patient", "Cancer", "Chr", "Start", "End", "VarClass", "VarType"])
+    cols = ["Center", "Patient", "Cancer", "Chr", "Start", "End", "VarClass", "VarType", "RefAllele", "TumorAllele1", "TumorAllele2"])
   f = File.open(filename, 'w')
   f.write(cols.join("\t") + "\n")
   return f
@@ -49,14 +49,12 @@ maf_by_cancer.each_pair do |cancer, files|
       #  puts "#{i} #{c}"
       #end
       cols = line.split("\t")
-
       cols.each { |e| raise "ERROR: #{cols.join(' ')}" if e.match(/\t/) }
 
-      (center, build, chr, startpos, endpos, strand, variant_class, variant_type) = cols[2..9]
+      (center, build, chr, startpos, endpos, strand, variant_class, variant_type, ref_allele, t1_allele, t2_allele) = cols[2..12]
       patient = cols[15].split("-")[2]
 
-      output = [center, patient, cancer, chr, startpos, endpos, variant_class, variant_type]
-
+      output = [center, patient, cancer, chr, startpos, endpos, variant_class, variant_type, ref_allele, t1_allele, t2_allele]
       if fh.has_key? chr
         fh[chr].write(output.join("\t") + "\n")
       end
