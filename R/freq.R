@@ -1,10 +1,46 @@
-source("R/lib/load_files.R")
-source("R/lib/wd.R")
+rm(list=ls())
+setwd("~/workspace/CancerCytogenetics/R")
+source("lib/load_files.R")
+source("lib/wd.R")
 
-setDataDirectory()
+datadir = "~/Data/sky-cgh/output/current"
+setwd(datadir)
+`%nin%`=Negate(`%in%`) 
 
-bp = loadBreakpoints("breakpoints.txt")
+bp = read.table("breakpoints.txt", sep="\t", header=T)
+bp$total.samples = bp$patients+bp$cell.lines
+
+bp = bp[order(-bp$total.samples),]
+t = as.table(bp[,9])
+names(t) = bp[,2]
+plot(t,type='h')
+
+# pull out centromeres
+arms = bp[ bp$band %nin% c('p11', 'q11'),]
+arms = arms[arms$chr !=' 9' & arms$band != 'q34',]
+t = as.table(arms[,9])
+names(t) = arms[,2]
+plot(t,type='h')
+
+
 chrinfo = loadChromosomeInfo()  
+
+
+## On a per-chromosome basis are there certain breakpoints that may stand out more?
+for (i in 1:22)
+  {
+  curr = bp[bp$chr == i,]
+  curr = curr[order(-curr$total.samples),]
+  
+  t = as.table(curr[,9])
+  names(t) = curr[,2]
+  
+  plot(t, type='h')
+  
+  break
+  }
+
+
 
 # frequency tables
 bpfreq = table(bp$Breakpoint)

@@ -1,15 +1,3 @@
-totalKaryotypes<-function()
-  {
-  t = read.table("totals.txt", sep="\t", row.names=1, header=T)
-  return( sum(t$Total) )
-  }
-
-unknowns<-function()
-  {
-  t = read.table("totals.txt", sep="\t", row.names=1, header=T)
-  if (nrow(t) <= 0) { stop("Unknown totals file is empty") }
-  return( sum(t$Unknown) )
-  }
 
 loadBands<-function(file = "../../genomic_info/chromosome_bands.csv")
   {
