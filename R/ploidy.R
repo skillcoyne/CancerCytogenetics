@@ -1,29 +1,56 @@
-resetwd()
-source("R/lib/load_files.R")
-source("R/lib/wd.R")
+rm(list=ls())
+setwd("~/workspace/CancerCytogenetics/R")
+source("lib/load_files.R")
+source("lib/wd.R")
 
-setDataDirectory()
 
+datadir = "~/Data/sky-cgh/output/current"
+setwd(datadir)
 
+total_karyotypes = 100240
 ## Ploidy changes ##
-pdy = read.table("ploidy.txt", header=T, sep="\t")
+pdy = read.table("noleuk-ploidy.txt", header=T, sep="\t")
 
-sample_leukemia_bps = FALSE  # this makes no real difference in the ploidy frequencies
-if (sample_leukemia_bps)
-  {
-  leuks = c('Acute myeloid leukemia', 'Acute lymphoblastic leukemia', "Non-hodgkin's lymphoma", 'Chronic myelogenous leukemia', 'Chronic lymphocytic leukemia')
-  pdy = sampleCancers(pdy, "Cancer", leuks)
-  }
+lpdy = read.table("leuk-ploidy.txt", header=T, sep="\t")
 
+# non leukemia
+pdygain = pdy[pdy$class == 'gain',]
+pdygain = pdygain[order(-pdygain$count),]
 
 
-colpdy = pdy[order(pdy$Ploidy),]
-pdycnts = sort(table(pdy$Ploidy), decreasing=T)
+gains = merge(pdygain, lpdygain, by.x=c('class','chromosome'), by.y=c('class','chromosome'))
+gains = gains[order(-gains$count.x, -gains$count.y), ]
 
-plot(pdycnts, type='h',  xaxt="n")
-axis(1, at=1:length(pdycnts), lab=rownames(pdycnts))
 
-#write.table(pdycnts[pdycnts > mean(pdycnts)],file="/Users/sarah.killcoyne/Data/sky-cgh/analysis/high-freq-ploidy.txt", quote=F, col.names=F)
+
+pdyloss = pdy[pdy$class == 'loss',]
+pdyloss = pdyloss[order(-pdyloss$count),]
+
+
+loss = merge(pdyloss, lpdyloss, by.x=c('class','chromosome'), by.y=c('class','chromosome'))
+loss = loss[order(-loss$count.x, -loss$count.y), ]
+
+par(mfrow=c(2,1))
+plot( (gains$count.x+gains$count.y)/total_karyotypes, type='h', col='blue', xaxt='n', main="Chr Gain", ylab="Prob. to gain", xlab="chr")
+lines(gains$count.x/total_karyotypes, type='p', col='green', xaxt='n')
+lines(gains$count.y/total_karyotypes, type='p', col='red')
+axis(1, at=1:nrow(gains), label=gains$chromosome)
+
+
+plot( (loss$count.x+loss$count.y)/total_karyotypes, type='h', col='blue', xaxt='n', main="Chr Loss", ylab="Prob. to lose", xlab="chr")
+lines(loss$count.x/total_karyotypes, type='p', col='green', xaxt='n')
+lines(loss$count.y/total_karyotypes, type='p', col='red')
+axis(1, at=1:nrow(loss), label=loss$chromosome)
+
+
+
+# leukemia
+lpdygain = lpdy[lpdy$class == 'gain',]
+lpdygain = lpdygain[order(-lpdygain$count),]
+
+lpdyloss = lpdy[lpdy$class == 'loss',]
+lpdyloss = lpdyloss[order(-lpdyloss$count),]
+
 
 
 
