@@ -3,39 +3,47 @@ setwd("~/workspace/CancerCytogenetics/R")
 source("lib/load_files.R")
 source("lib/wd.R")
 
-datadir = "~/Data/sky-cgh/output/29052013"
+datadir = "~/Data/sky-cgh/output"
 setwd(datadir)
 
 `%nin%`=Negate(`%in%`) 
-chrinfo = loadChromosomeInfo()  
+chrinfo = loadChromosomeInfo("../genomic_info/chromosome_gene_info_2012.txt")  
 
-bp = read.table("breakpoints.txt", sep="\t", header=T)
+bp = read.table("current/noleuk-breakpoints.txt", sep="\t", header=T)
 
+bp2 = read.table("current/leuk-breakpoints.txt", sep="\t", header=T)
 
-plots = TRUE
+merged = merge(bp[,c(1,2,7)], bp2[,c(1,2,7)], by.x=c('chr','band'), by.y=c('chr','band'))
+
+merged$total.aberrations = merged[,3] + merged[,4]
+
+#bp = read.table("current/missing_all_leuks_breakpoints.txt", header=T, sep="\t")
+
+#bp = merged
+
+plots = F
 
 # drop anyting that shows up in < 5 samples
 #bp = bp[ bp$total.samples >= 5, ]
 nrow(bp)
 
 total_major_bps = nrow(bp)
-total_count_bps = sum(bp$total.samples)
+total_count_bps = sum(bp[, 'total.aberrations'])
 
 # turn it into a table
 bp_freq = vector(mode="numeric", length=nrow(bp))
 names(bp_freq) = paste(bp$chr, bp$band, sep="")
-bp_freq[1:length(bp_freq)] = bp$total.samples
+bp_freq[1:length(bp_freq)] = bp[, 'total.aberrations']
 
 # ignoring X and Y
-chromosome_counts=vector("numeric",24)
-
-names(chromosome_counts)= c(1:22, 'X', 'Y')
-for(i in c(1:22, 'X', 'Y'))
+c = c(1:22)
+chromosome_counts=vector("numeric",length(c))
+names(chromosome_counts)=c
+for(i in names(chromosome_counts))
 	{
   curr = bp[bp$chr == i,]
-  chromosome_counts[i] = sum(curr$patients+curr$cell.lines)
+  chromosome_counts[i] = sum(curr[,'total.aberrations'])
 	}
-c=1:24
 
 # Obviously correlates to length
 cor.test(chromosome_counts[c],chrinfo[c,"Base.pairs"])
@@ -77,7 +85,7 @@ if (plots)
 	  xpos[2]=adjusted_scores[i]
 	  ypos[2]=density_pos[i]
 	  lines(xpos,ypos)
-	  text(xpos[2],ypos[2],labels=i,pos=3)
+	  text(xpos[2],ypos[2],labels=names(adjusted_scores[i]),pos=3)
 	  }
   }
 
@@ -103,8 +111,6 @@ if (plots)
   plot(instability_score,chrinfo[c,"Confirmed.proteins"], main="Cancer instability and known protein counts", 
      sub="pearson cor=.31 (pval=0.16)",xlab="Chromosome instability score",ylab="Protein count", type="n")
   text(instability_score,chrinfo[c,"Confirmed.proteins"],labels=names(instability_score))
-  #plot(instability_score,chrinfo[c,"Total.Prot.RNA"], main="Cancer instability and summed protein/RNA counts",sub="pearson cor=.31 (pval=0.16)",xlab="Chromosome instability score",ylab="Protein count", type="n")
-  #text(instability_score,chrinfo[c,"Total.Prot.RNA"],labels=names(instability_score))
   }
 
 # we can adjust for length
@@ -115,8 +121,8 @@ if (plots)
   #instability_score = sort(instability_score)
   plot(instability_score, chrinfo[c,"Confirmed.proteins"]/chrinfo[c,"Base.pairs"]^.7, 
       main="Cancer instability and known protein counts",
-      sub=corr_str,xlab="Chromosome instability score",ylab="Length normalised protein count", type="p", col='blue')
-  text(instability_score, chrinfo[c,"Confirmed.proteins"]/chrinfo[c,"Base.pairs"]^.7,labels=names(instability_score),pos=3)
+      sub=corr_str,xlab="Chromosome instability score",ylab="Length normalised protein count", type="n")
+  text(instability_score, chrinfo[c,"Confirmed.proteins"]/chrinfo[c,"Base.pairs"]^.7,labels=names(instability_score))
   }
 
 #but now 19 is an outlier- but if we ignore it we get slightly more significant results (reasonably high instability with very high protein encoding)
@@ -143,8 +149,11 @@ for (i in 1:3)
   print(groups[groups == i])  
   }
 
+
 filename = "~/Analysis/Database/cancer/chr_instability_prob.txt"
 write("# Normal distribution, probability score per chromosome. Each score is independent of the other chromosomes", file=filename)
-write(paste("# Stats for scores used to generated scores - Mean:", round(mean(adjusted_scores), 3), "SD:", round(  sd(adjusted_scores), 3)), app=T, file=filename)
-write.table( round(instability_score, 3), quote=F, col.names=F, sep="\t", app=T, file=filename)
+write.table( probability_list, quote=F, col.names=F, sep="\t", app=T, file=filename)
+
+
+
 

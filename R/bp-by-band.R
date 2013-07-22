@@ -112,6 +112,7 @@ source("lib/load_files.R")
 source("lib/wd.R")
 
 datadir = "~/Data/sky-cgh/output"
+outdir = "~/Analysis/Database/cancer"
 setwd(datadir)
 
 total_karyotypes = 100240
@@ -119,33 +120,20 @@ total_karyotypes = 100240
 `%nin%`=Negate(`%in%`) 
 bandinfo = read.table(paste(datadir,"band_genes.txt", sep="/"), header=T, sep="\t")
 
-df = read.table("current/noleuk-breakpoints.txt", sep="\t", header=T)
+#df = read.table("current/noleuk-breakpoints.txt", sep="\t", header=T)
+df = read.table("current/leuk-breakpoints.txt", sep="\t", header=T)  # sampled leuk bp's to cut down on bias
 
-df = read.table("current/leuk-breakpoints.txt", sep="\t", header=T)
 ## To simplify, the bands with < 5 aberrations are all subbands.  We're only dealing with major bands and these
 # don't make a difference in the analysis
 df = df[-which(df$total.aberrations <= 5),]
 
 # the nonleuk bands not found in leuk bps, all others are shared
-setdiff(paste(df$chr, df$band), paste(dfl$chr, dfl$band))
-
-# Considering the set intersection/diff I'm not sure I really need to do this anymore.  The leukemia bps from the 30% of karyotypes that are in ALL and AML
-# are represended in the 'leuk' file but are shared anyhow.
-#sample_dfl = vector("numeric")
-#for (i in 1:nrow(dfl))
-#  {
-#  sample_dfl = c(sample_dfl, rep(i, dfl[i,'total.karyotypes']))
-#  }
-#leuk_samples = table(sample(sample_dfl, 1000))
-
-#dfl = dfl[names(leuk_samples),]
-#dfl$total.karyotypes = leuk_samples
-
-#df = merge(df, dfl[,c(1,2,5,6,)], by.x=c('chr', 'band'), by.y=c('chr','band'), all.y=T, all.x=T)
-#df$total.karyotypes = df$total.karyotypes.x + df$total.karyotypes.y
+setdiff(paste(df$chr, df$band), paste(df$chr, df$band))
 
 break_info = merge(df, bandinfo[,c(1,2,5)], by.x=c('chr', 'band'), by.y=c('chr','band'))
 break_info$bp.length = break_info$end - break_info$start
+
+setwd(outdir)
 
 # All bands with breaks but NO genes are in the centromere regions...pull them out see if correlations improve
 # Note that not all centromeres lack genes apparently
@@ -154,7 +142,9 @@ break_info$bp.length = break_info$end - break_info$start
 cmrows = grep("(11|12)", break_info$band)
 centromeres = break_info[ cmrows, ]
 centromeres = centromeres[order(centromeres$total.breaks, decreasing=T),]
-centromeres$chance.to.break = round(centromeres[,'total.karyotypes']/total_karyotypes, 4)
+
+#centromeres$chance.to.break = round(centromeres[,'total.karyotypes']/total_karyotypes, 4)
+#centromeres = centromeres[order(centromeres$chance.to.break, decreasing=T),]
 
 # Not using this for anything, it mostly just confirms the chromosome instability analysis
 break_info = break_info[ -cmrows,] 
@@ -169,8 +159,8 @@ summary(break_info$total.aberrations)
 
 ## CLASS 2 ##
 topBP = break_info[ break_info$total.aberrations >= mean(break_info$total.aberrations), ]
-topBP$chance.to.break = round(topBP[,'total.aberrations']/sum(topBP[,'total.aberrations']), 4)
-topBP$chance.to.break = round(topBP[,'total.karyotypes']/total_karyotypes, 4)
+#topBP$chance.to.break = round(topBP[,'total.aberrations']/sum(topBP[,'total.aberrations']), 4)
+#topBP$chance.to.break = round(topBP[,'total.karyotypes']/total_karyotypes, 4)
 
 ## CLASS 3 ##
 remainder = break_info[ break_info$total.aberrations < mean(break_info$total.aberrations), ]
@@ -178,8 +168,7 @@ remainder = break_info[ break_info$total.aberrations < mean(break_info$total.abe
 remCor = corTests(remainder)
 plotCor(remCor$bk, remCor$rc)
 
-
-remainder$chance.to.break = round(remainder[,'total.karyotypes']/total_karyotypes, 4)
+#remainder$chance.to.break = round(remainder[,'total.karyotypes']/total_karyotypes, 4)
 
 save(file='bpband.Rdata', centromeres, topBP, remainder)
 
@@ -190,5 +179,18 @@ write.table(centromeres[,cols], row.name=F, quote=F, sep="\t", file="class1-cent
 write.table(topBP[,cols], row.name=F, quote=F, sep="\t", file="class2-topbp.txt")
 
 write.table(remainder[,cols], row.name=F, quote=F, sep="\t", file="class3-remainder.txt")
+
+
+centromeres = centromeres[,cols]
+centromeres$class=1
+
+topBP = topBP[,cols]
+topBP$class=2
+
+remainder = remainder[,cols]
+remainder$class=3
+
+all = rbind(centromeres, topBP, remainder)
+write.table(all, quote=F, row.name=F, col.name=F, sep="\t", file="bp-classes.txt")
 
 
