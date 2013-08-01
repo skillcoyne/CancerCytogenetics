@@ -1,3 +1,6 @@
+## This script does an analysis of the instability of each chromosome. The current result is a discrete distribution of probabilities ##
+
+
 rm(list=ls())
 setwd("~/workspace/CancerCytogenetics/R")
 source("lib/load_files.R")
@@ -11,18 +14,24 @@ chrinfo = loadChromosomeInfo("../genomic_info/chromosome_gene_info_2012.txt")
 
 bp = read.table("current/noleuk-breakpoints.txt", sep="\t", header=T)
 
-bp2 = read.table("current/leuk-breakpoints.txt", sep="\t", header=T)
+leuk = FALSE
 
-merged = merge(bp[,c(1,2,7)], bp2[,c(1,2,7)], by.x=c('chr','band'), by.y=c('chr','band'))
+# Load files
+bp = read.table("current/noleuk-breakpoints.txt", sep="\t", header=T)
 
-merged$total.aberrations = merged[,3] + merged[,4]
+if (leuk)
+  {
+  bp2 = read.table("current/leuk-breakpoints.txt", sep="\t", header=T)
+  cols = c('chr','band','start','end', 'total.karyotypes')
+  merged = merge(bp[,cols], bp2[,cols], by=cols[1:4])
+  
+  merged$total.karyotypes = merged[,'total.karyotypes.x'] + merged[,'total.karyotypes.y']
+  merged$total.karyotypes.x = NULL
+  merged$total.karyotypes.y = NULL
+  bp = merged
+  }
 
-#bp = read.table("current/missing_all_leuks_breakpoints.txt", header=T, sep="\t")
-
-#bp = merged
-
-plots = F
-
+plots = T
 # drop anyting that shows up in < 5 samples
 #bp = bp[ bp$total.samples >= 5, ]
 nrow(bp)
@@ -40,16 +49,14 @@ c = c(1:22)
 chromosome_counts=vector("numeric",length(c))
 names(chromosome_counts)=c
 for(i in names(chromosome_counts))
-	{
-  curr = bp[bp$chr == i,]
-  chromosome_counts[i] = sum(curr[,'total.aberrations'])
-	}
+  chromosome_counts[i] = sum(bp[bp$chr == i,'total.karyotypes'])
 
 # Obviously correlates to length
-cor.test(chromosome_counts[c],chrinfo[c,"Base.pairs"])
+cor.test(chromosome_counts,chrinfo[c,"Base.pairs"])
 
+length_adjust = 0.9
 #-- so we adjust the length in a non-linear manner (with a bit of mucking arround found ^.7 gave nearly no correlation) --#
-adjusted_scores=chromosome_counts/(chrinfo[c,"Base.pairs"]^(.7))
+adjusted_scores=chromosome_counts/(chrinfo[c,"Base.pairs"]^length_adjust)
 #and now we don;t have a correlation with length- this is our chromosome instability score
 cor.test(adjusted_scores[c],chrinfo[c,"Base.pairs"])
 #and now we can (sorta) say that chromosome instability related directly to the amount of information encoded on that chromosome
@@ -68,7 +75,7 @@ ks.test(adjusted_scores,pnorm,mean(adjusted_scores),sd(adjusted_scores))
 
 ## -- Probabilities are probably the most useful -- ##
 #they are normal so we generate the proabilities of these scores occuring if they follow the normal dist
-probability_list=pnorm(adjusted_scores,mean(adjusted_scores),sd(adjusted_scores))
+probability_list = pnorm(adjusted_scores,mean(adjusted_scores),sd(adjusted_scores))
 
 if (plots)
   {
@@ -93,15 +100,14 @@ if (plots)
 one_sided_probability_list=((0.5-probability_list)^2)^.5 *2 
 names(chromosome_counts)=names(one_sided_probability_list)
 sorted_one_sided_probability_list=sort(one_sided_probability_list)
-plot(1:length(sorted_one_sided_probability_list),sorted_one_sided_probability_list,xlab="Chromosome Number",ylab="Unusual Chromosome stability/instability", type="n",  xaxt = "n")
+plot(1:length(sorted_one_sided_probability_list),sorted_one_sided_probability_list,xlab="Chromosome Number",ylab="Unusual Chromosome stability/instability", type="n", xaxt="n")
 text(1:length(sorted_one_sided_probability_list),sorted_one_sided_probability_list,labels=names(sorted_one_sided_probability_list))
 
 #so the question is how does our instability score relate to other chromosome function (and does mapping to a dist give us anything)
 #this is a bit dubious as we aren't adjusting for length for the protein count
 instability_score=probability_list
 
-cor.test(instability_score,chrinfo[c,"Confirmed.proteins"])
-cor.test(instability_score,chrinfo[c,"Total.Prot.RNA"])
+cor.test(instability_score[c], chrinfo[c,"Confirmed.proteins"])
 
 # if we don;t adjust for length we get ok results- fitting to dist doesn't give us much more apart from a pretty pic and soemthing that sounds clever...
 # should be noted that the mapped to dist and normal scores are basically the same (very highly correlated as the scores are basically normally distributed) 
@@ -114,15 +120,15 @@ if (plots)
   }
 
 # we can adjust for length
-ins_corr = cor.test(instability_score,chrinfo[c,"Confirmed.proteins"]/chrinfo[c,"Base.pairs"]^.7)
+ins_corr = cor.test(instability_score,chrinfo[c,"Confirmed.proteins"]/(chrinfo[c,"Base.pairs"]^length_adjust))
 corr_str = paste("pearson cor=", round(ins_corr$estimate, 2), "  (pval=", round(ins_corr$p.value, 2), ")", sep="")
 if (plots)
   {
   #instability_score = sort(instability_score)
-  plot(instability_score, chrinfo[c,"Confirmed.proteins"]/chrinfo[c,"Base.pairs"]^.7, 
+  plot(instability_score, chrinfo[c,"Confirmed.proteins"]/(chrinfo[c,"Base.pairs"]^length_adjust), 
       main="Cancer instability and known protein counts",
       sub=corr_str,xlab="Chromosome instability score",ylab="Length normalised protein count", type="n")
-  text(instability_score, chrinfo[c,"Confirmed.proteins"]/chrinfo[c,"Base.pairs"]^.7,labels=names(instability_score))
+  text(instability_score, chrinfo[c,"Confirmed.proteins"]/(chrinfo[c,"Base.pairs"]^length_adjust),labels=names(instability_score))
   }
 
 #but now 19 is an outlier- but if we ignore it we get slightly more significant results (reasonably high instability with very high protein encoding)
@@ -151,9 +157,6 @@ for (i in 1:3)
 
 
 filename = "~/Analysis/Database/cancer/chr_instability_prob.txt"
-write("# Normal distribution, probability score per chromosome. Each score is independent of the other chromosomes", file=filename)
-write.table( probability_list, quote=F, col.names=F, sep="\t", app=T, file=filename)
-
-
-
+write("# Normal distribution, probability score per chromosome. Each score is independent of the other chromosomes", file=filename, app=F)
+write.table( probability_list/sum(probability_list), quote=F, col.names=F, sep="\t", app=T, file=filename)
 
