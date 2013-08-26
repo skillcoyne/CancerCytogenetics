@@ -32,13 +32,36 @@ pois.ks<-function(t)
   return(ks)
   }
   
+probs.in.ranges<-function(ranges, counts, decimals=5, total_counts)
+  {
+  rframe = as.data.frame(matrix( rep(0, length(ranges)), ncol=1, nrow=length(ranges), dimnames=list(sapply( ranges, function(s) paste(s[1], s[2], sep="-") ), c("count")) ))
+  for (n in 1:length(ranges))
+    {
+    x = unlist(ranges[n])
+    rframe[ paste(x[1], x[2], sep="-"), 1] =  sum(counts[ which( as.numeric(names(counts)) >= x[1] & as.numeric(names(counts)) <= x[2]  ) ])
+    }
+  rframe$prob = round(rframe[,'count']/total_counts, decimals)
+  rframe$prob = round(rframe[,'prob']/sum(rframe[,'prob']), decimals)
+  
+  if (sum(rframe$prob) < 1)
+    rframe$prob[rframe$prob == min(rframe$prob)] = signif(rframe$prob[rframe$prob == min(rframe$prob)] + (1-sum(rframe$prob)), decimals)
+  if (sum(rframe$prob) > 1)
+    rframe$prob[rframe$prob == min(rframe$prob)] = signif(rframe$prob[rframe$prob == min(rframe$prob)] - (sum(rframe$prob)-1), decimals)
+  
+  rframe = rframe[order(-rframe$prob),]
+  return(rframe)
+  }
 
-total_karyotypes = 100240
+
+
+
 datadir = "~/Data/sky-cgh/output"
 setwd(datadir)
 outdir = "~/Analysis/Database/cancer"
 
 abrkt = read.table("current/abr_per_kt.txt", header=T, sep="\t", row.names=1)
+total_karyotypes = nrow(abrkt)
+
 norm.ks(abrkt[,'aneuploidy.count'])
 pois.ks(abrkt[,'aneuploidy.count'])
 
@@ -58,61 +81,22 @@ bpkt$prob = round( bpkt[,2]/total_karyotypes, 5)
 bpkt = bpkt[ order(bpkt$prob), ]
 
 # group them for more continuous probabilities
-bp = as.data.frame(matrix(c(0,0,0,0), ncol=1, nrow=4, dimnames=list(c("1-5","5-10", "10-20", "20-100"), c("count"))))
+bp_tbl = bpkt[,2]
+names(bp_tbl) = bpkt[,1]
+bp_probs = probs.in.ranges( list(c(1,5), c(6,10), c(11,20), c(21,100)), bp_tbl, 5, total_karyotypes )
 
-for(r in 1:nrow(bpkt))
-  {
-  if (bpkt[r,'bps'] <= 5) bprow = "1-5"
-  if (bpkt[r,'bps'] > 5 & bpkt[r, 'bps'] <= 10) bprow = "5-10"
-  if (bpkt[r,'bps'] > 10 & bpkt[r, 'bps'] <= 20) bprow = "10-20"
-  if (bpkt[r,'bps'] > 20 & bpkt[r, 'bps'] <= 100) bprow = "20-100"
-  
-  bp[bprow, "count"] = bp[bprow, "count"] + bpkt[r,"kt.count"]
-  }
-bp$prob = round(bp$count/total_karyotypes, 5)
+## Aberrations and aneuploidy per karyotype
+abrs = read.table("current/abr_per_kt.txt", header=T)
 
-bp$prob = round(bp$prob/sum(bp$prob), 5)
+pdy_probs = probs.in.ranges(list(c(0,3), c(4,10), c(11,20), c(21,35)), table(abrs[,2]), 5, total_karyotypes)
+abr_probs = probs.in.ranges(list(c(0,2), c(3,7), c(8,14), c(15,20), c(21,55)), table(abrs[,3]), 5, total_karyotypes)
 
-if (sum(bp$prob) < 1)
-  bp$prob[bp$prob == min(bp$prob)] = signif(bp$prob[bp$prob == min(bp$prob)] + (1-sum(bp$prob)), 5)
-if (sum(bp$prob) > 1)
-  bp$prob[bp$prob == min(bp$prob)] = signif(bp$prob[bp$prob == min(bp$prob)] - (sum(bp$prob)-1), 5)
+bp_probs$type = "breakpoint"
+pdy_probs$type = "aneuploidy" 
+abr_probs$type = "aberration"
 
-bp = bp[order(-bp$prob),]
-#bp$bps = rownames(bp)
-
-
-write.table(cbind(rownames(bp), bp$prob), row.name=F,col.names=c('bps','probs'), quote=F, sep="\t", filename=)
-
-
-
-
-chrkt = read.table("current/chr_per_kt.txt", sep="\t")
-colnames(chrkt) = c('chrs', 'kt.count')
-chrkt = chrkt[order(chrkt[,1]),]
-
-plot((chrkt$kt.count), type='o', col='blue', xlab="Number of chrs", ylab="(Karyotype Count)")
-
-norm.ks(chrkt[,2]) # just about normal
-pois.ks(chrkt[,2]) # again, pois fits better
-
-pdy = read.table("current/ploidy_per_kt.txt", sep="\t")
-colnames(pdy) = c('ploidy','kt.count')
-pdy = pdy[order(pdy$ploidy),]
-
-plot((pdy$kt.count), type='o', col='blue', xlab="Total Ploidy", ylab="Karyotype Count")
-
-norm.ks(pdy[,2])
-pois.ks(pdy[,2])
-
-
-#probability_list = pnorm(pdy[,2],mean(pdy[,2]),sd(pdy[,2]))
-#x = ppois(pdy[,2], mean(pdy[,2]))
-
-#x = rpois(1000, mean(pdy[,2]))
-#x = rnorm(1000, mean(pdy[,2]), sd(pdy[,2]))
-
-
-#
+#write("## General karyotype probabilities given for counts in ranges", file=paste(outdir, "karyotype-probs.txt", sep="/"), app=F)
+#for (pf in list(bp_probs, pdy_probs, abr_probs))
+#  write.table(cbind(rownames(pf), pf[,c('prob', 'type')]), row.name=F,col.names=F, quote=F, sep="\t", app=T, file=paste(outdir, "karyotype-probs.txt", sep="/"))
 
 

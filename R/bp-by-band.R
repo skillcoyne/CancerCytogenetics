@@ -100,7 +100,7 @@ bp.cor.tests<-function(bpinfo, col)
 
 plot.cor<-function(tests)
   {
-  chrinfo = loadChromosomeInfo("../genomic_info/chromosome_gene_info_2012.txt")  
+  chrinfo = read.table("../genomic_info/chromosome_gene_info_2012.txt", header=T, sep="\t")  
   par(mfrow=c(2,3))
   for (i in 1:ncol(tests))
     {
@@ -130,9 +130,20 @@ plot.norm<-function(adjusted_scores, title)
     }
   }
 
-setwd("~/workspace/CancerCytogenetics/R")
-source("lib/load_files.R")
-source("lib/wd.R")
+adjust.to.one<-function(p, r=5)
+  {
+  adjusted = round(p/sum(p), r) 
+  
+  if (sum(adjusted) > 1)
+    adjusted[ which(adjusted == min(adjusted)) ] = adjusted[ which(adjusted == min(adjusted)) ] - (sum(adjusted) - 1)
+  
+  if (sum(adjusted) < 1)
+    adjusted[ which(adjusted == min(adjusted)) ] = adjusted[ which(adjusted == min(adjusted)) ] + (1 - sum(adjusted))
+  
+  return(adjusted)
+  }
+
+
 
 datadir = "~/Data/sky-cgh/output"
 outdir = "~/Analysis/Database/cancer"
@@ -151,6 +162,7 @@ df = df[-which(df[,'total.karyotypes'] <= 5),]
 
 break_info = merge(df, bandinfo[,c(1,2,5)], by.x=c('chr', 'band'), by.y=c('chr','band'))
 break_info$bp.length = break_info$end - break_info$start
+all = break_info
 
 # All bands with breaks but NO genes are in the centromere regions...pull them out see if correlations improve
 # Note that not all centromeres lack genes apparently
@@ -165,12 +177,12 @@ centromeres = break_info[ cmrows, ]
 centromeres = centromeres[order(centromeres$chr, decreasing=T),]
 
 # centromeres show a correlation with length, not surprised
-cor.test(scores[,'bp.length'], centromeres[,'total.karyotypes'])
+cor.test(centromeres[,'bp.length'], centromeres[,'total.karyotypes'])
 
 length_adj = 0.6
 # Normalize the total for length  and the correlation drops
 cent_adj = centromeres[,'total.karyotypes']/(centromeres[,'bp.length']^length_adj)
-cor.test(cent_adj, scores[,'bp.length'])
+cor.test(cent_adj, centromeres[,'bp.length'])
 
 # not really normal, so adjusted scores maybe best I can do -- er, this is actually the same thing I use in all the others too...
 ks.test(cent_adj, pnorm, mean(cent_adj), sd(cent_adj))
@@ -225,20 +237,39 @@ break_info = break_info[ order(break_info[,'total.karyotypes'], decreasing=T),]
 sd(break_info[,'total.karyotypes'])
 summary(break_info[,'total.karyotypes'])
 
-## CLASS 2 ##
-#topBP = break_info[ break_info[,'total.karyotypes'] >= mean(break_info[,'total.karyotypes']), ]
-
-## CLASS 3 ##
-#remainder = break_info[ break_info[,'total.karyotypes'] < mean(break_info[,'total.karyotypes']), ]
-
 cols = c('chr','band','start','end','bp.prob')
 write.table(centromeres[,cols], row.name=F, quote=F, sep="\t", file=paste(outdir, "centromeres-probs.txt", sep="/"))
 
-#cols = c('chr','band','start','end','per.chr.prob')
-#write.table(topBP[,cols], row.name=F, quote=F, sep="\t", file=paste(outdir, "class2-topbp.txt", sep="/"))
-#write.table(remainder[,cols], row.name=F, quote=F, sep="\t", file=paste(outdir, "class3-remainder.txt", sep="/"))
+## Note...the scores don't change if the centromeres are't removed from the list so for simplicity in the selection process centromeres will be put into this list
+# What I really need for the database though is breakpoint probabilities per chromosomes
+all_scores = bp.cor.tests(all, "total.karyotypes")$scores
+# scores per breakpoint within each chromosome
+for (i in 1:length(all_scores))
+  {
+  chr = names(all_scores[i])
+  probability_list = pnorm(all_scores[[chr]], mean(all_scores[[chr]]), sd(all_scores[[chr]]))
+  pf = as.data.frame( adjust.to.one(probability_list/sum(probability_list), 5) )  # prob adjusted to 0-1
+  pf$band = row.names(pf)
+  
+  per_chr = merge(break_info[break_info$chr == chr,], pf, by=c('band'))
+  names(per_chr)[length(per_chr)] = 'per.chr.prob'
+  if (exists("temp_bk"))  temp_bk = rbind(temp_bk, per_chr) 
+  else  temp_bk = per_chr 
+  }
+all = temp_bk
+rm(temp_bk)
 
 
-write.table(break_info[,c('chr','band','bp.prob', 'per.chr.prob')], quote=F, row.name=F, sep="\t", file=paste(outdir, "all-bp-prob.txt", sep="/"))
 
+
+#write.table(all[,c('chr','band','bp.prob', 'per.chr.prob')], quote=F, row.name=F, sep="\t", file=paste(outdir, "all-bp-prob.txt", sep="/"))
+
+
+chr_ins = read.table(paste(outdir, "chr_instability_prob.txt", sep="/"), header=F)
+colnames(chr_ins) = c("chr", "prob")
+
+chr_ins = merge(chr_ins, carm_probs, by.x="chr", by.y="row.names")
+
+
+#write.table(chr_ins, quote=F, row.name=F, sep="\t", file=paste(outdir, "chr_instability_prob.txt", sep="/"))
 

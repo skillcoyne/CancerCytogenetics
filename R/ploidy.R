@@ -14,23 +14,21 @@ adjust.to.one<-function(p, r=5)
   return(adjusted)
   }
 
-simple.prob<-function(d)
+simple.prob<-function(d, total)
   {
   d = d[ order( d$chromosome, decreasing=T ), ]
   
-  d$gain.prob = signif( adjust.to.one(d[,'gain']/d[,'karyotypes']), 5)
-  d$loss.prob = signif( adjust.to.one(d[,'loss']/d[,'karyotypes']), 5)
+  d$gain.prob = d[,'gain']/d[,'karyotypes']
+  d$loss.prob = d[,'loss']/d[,'karyotypes']
   
-  overall =  d$karyotypes/total_karyotypes
-  d$overall.prob = adjust.to.one(overall/sum(overall))
+  for (r in 1:nrow(d))
+    d[r,c('gain.prob','loss.prob')] = adjust.to.one(d[r,c('gain.prob', 'loss.prob')])
   
-  return(d[ order(-d$overall.prob), ])
+  overall =  d$karyotypes/total
+  d$prob = adjust.to.one(overall/sum(overall))
+  
+  return(d[ order(-d$prob), ])
   }
-
-setwd("~/workspace/CancerCytogenetics/R")
-source("lib/load_files.R")
-source("lib/wd.R")
-
 
 datadir = "~/Data/sky-cgh/output/current"
 setwd(datadir)
@@ -71,7 +69,7 @@ cor.test(adj, ploidy_info[,'Confirmed.proteins'])
 
 
 ## So back to a very simple probability
-all = simple.prob(all)
+all = simple.prob(all, total_karyotypes)
 
 
 
@@ -84,9 +82,9 @@ plot(all[,'overall.prob'], xaxt='n')
 axis(1, at=1:nrow(all), label=all$chromosome)
 
 setwd("~/Analysis/Database/cancer")
-write.table( all[,c('chromosome','gain.prob', 'loss.prob')], file="aneuploidy-probs.txt", quote=F, sep="\t", row.name=F )
+write.table( all[,c('chromosome','prob', 'gain.prob', 'loss.prob')], quote=F, sep="\t", row.name=F, file="aneuploidy-probs.txt" )
 
-write.table( all[,c('chromosome','gain.prob', 'loss.prob')], quote=F, sep="\t", row.name=F )
+write.table( all[,c('chromosome','prob', 'gain.prob', 'loss.prob')], quote=F, sep="\t", row.name=F )
 
 
 

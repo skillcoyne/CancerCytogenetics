@@ -45,7 +45,7 @@ names(bp_freq) = paste(bp$chr, bp$band, sep="")
 bp_freq[1:length(bp_freq)] = bp[, 'total.aberrations']
 
 # ignoring X and Y
-c = c(1:22)
+c = c(1:22, 'X', 'Y')
 chromosome_counts=vector("numeric",length(c))
 names(chromosome_counts)=c
 for(i in names(chromosome_counts))
@@ -156,7 +156,7 @@ for (i in 1:3)
   }
 
 
-filename = "~/Analysis/Database/cancer/chr_instability_prob.txt"
-write("# Normal distribution, probability score per chromosome. Each score is independent of the other chromosomes", file=filename, app=F)
-write.table( probability_list/sum(probability_list), quote=F, col.names=F, sep="\t", app=T, file=filename)
+#filename = "~/Analysis/Database/cancer/chr_instability_prob.txt"
+#write("# Normal distribution, probability score per chromosome. Each score is independent of the other chromosomes", file=filename, app=F)
+#write.table( round(probability_list/sum(probability_list), 5), quote=F, col.names=F, sep="\t", app=T, file=filename)
 

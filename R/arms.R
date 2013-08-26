@@ -140,7 +140,7 @@ groups = cutree(ins_fit, k=3)
 plot(ins_fit, main="Chromosome Arm Instability")
 rect.hclust(ins_fit, k=3, border=c("red", "blue", "green"))
 
-filename = "~/Analysis/Database/cancer/arm_chr_instability_prob.txt"
-write("# Normal distribution, probability score per chromosome. Each score is independent of the other chromosomes", file=filename, app=F)
-write.table( arm_probability_list/sum(arm_probability_list), quote=F, col.names=F, sep="\t", app=T, file=filename)
+#filename = "~/Analysis/Database/cancer/arm_chr_instability_prob.txt"
+#write("# Normal distribution, probability score per chromosome. Each score is independent of the other chromosomes", file=filename, app=F)
+#write.table( arm_probability_list/sum(arm_probability_list), quote=F, col.names=F, sep="\t", app=T, file=filename)
 
