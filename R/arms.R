@@ -11,49 +11,51 @@ datadir = "~/Data/sky-cgh/output"
 outdir = "~/Analysis/Database/cancer"
 setwd(datadir)
 
-total_karyotypes = 100240
-leuk = FALSE
+leuk = T
 
 # Load files
-bp = read.table("current/noleuk-breakpoints.txt", sep="\t", header=T)
-
+bp = load.breakpoints("current/noleuk-breakpoints.txt")
 if (leuk)
-  {
-  bp2 = read.table("current/leuk-breakpoints.txt", sep="\t", header=T)
-  cols = c('chr','band','start','end', 'total.karyotypes')
-  merged = merge(bp[,cols], bp2[,cols], by=cols[1:4])
+  bp = load.breakpoints(c("current/noleuk-breakpoints.txt", "current/leuk-breakpoints.txt"))
 
-  merged$total.karyotypes = merged[,'total.karyotypes.x'] + merged[,'total.karyotypes.y']
-  merged$total.karyotypes.x = NULL
-  merged$total.karyotypes.y = NULL
-  bp = merged
-  }
 
 nrow(bp)
 chrinfo = loadChromosomeInfo("../genomic_info/chromosome_gene_info_2012.txt")
 
-bp = bp[bp$total.karyotypes > 5,]
-
-bandinfo = read.table(paste(datadir,"band_genes.txt", sep="/"), header=T, sep="\t")
-
+bandinfo = read.table("../genomic_info/band_genes.txt",  header=T, sep="\t")
+bandinfo$length = bandinfo$end - bandinfo$start
 ## Most of these are driven by breakages at the centromeres.  What happens when we look just at the arms
+# how the hell did I decide this?
+
+
+cmrows = grep("(p|q)(11)",bp$band)
+arms = grep("(p|q)(11)",bp$band,invert=T)
+
+
 ## CENTROMERES ## ignore X,Y
-cmrows = grep("(11|12)", bp$band)
 centromeres = bp[ cmrows, ]
+centinfo = bandinfo[ grep("(p|q)(10|11|12)",bandinfo$band),]
 
 # drop centromeric bands
 bp = bp[ -cmrows, ]
-
-cmrows = grep("(11|12)", bandinfo$band)
-bandinfo = bandinfo[ -cmrows, ]
-bandinfo$length = bandinfo$end - bandinfo$start
+bandinfo = bandinfo[ grep("(p|q)(10|11|12)",bandinfo$band,invert=T),]
 
 ## Centromeres are removed, so now how long are the arms
-chromosomes = c(1:22)
-cols = c('bps', 'genes', 'length')
-arms = matrix(nrow=length(chromosomes), ncol=length(cols), dimnames=list(chromosomes, cols))
+# ignoring X and Y
+chrs = c(1:22)#, 'X', 'Y')
+arm_counts=as.data.frame(matrix(nrow=length(chrs),ncol=3,dimnames=list(chrs,c('count','length','genes'))))
+for(i in chrs)
+  arm_counts[i,] = c(sum(bp[bp$chr == i,'total.karyotypes']), sum(bandinfo[bandinfo$chr == i, 'length']), sum(bandinfo[bandinfo$chr == i, 'gene.count']))
+
+cent_counts=as.data.frame(matrix(nrow=length(chrs),ncol=3,dimnames=list(chrs,c('count','length','genes'))))
+for(i in chrs)
+  cent_counts[i,] = c(sum(centromeres[centromeres$chr == i,'total.karyotypes']), sum(centinfo[centinfo$chr == i, 'length']), sum(centinfo[centinfo$chr == i, 'gene.count']))
+
+
+
+## does it matter how far the band is from the centromere?
 distance_cor = matrix(nrow=length(chromosomes), ncol=2, dimnames=list(chromosomes, c('p','q')))
-for (chr in chromosomes)
+for (chr in chrs)
   {
   scores = bp[bp$chr == chr,]
   scores = scores[order(scores$band),]
@@ -84,32 +86,43 @@ for (chr in chromosomes)
     print(e)
   })
   
-  arms[chr, 'bps'] = sum(scores$total.karyotypes)
-  
-  # ---- #
-  bands = bandinfo[bandinfo$chr == chr,]
-  bands = bands[order(bands$band),]
-  qarm = grep("q", bands$band)
-  arms[chr, 'length'] = sum(bands[ qarm, 'length' ]) + sum(bands[ -qarm, 'length' ])
-  ## just a sanity check
-  if (arms[chr, 'length'] > chrinfo[chr, 'Base.pairs'])
-    stop( paste(chr, "arm lengths incorrect") )
-  arms[chr, 'genes'] = sum(bands$gene.count)
   }  
 
-## aaaand, this suggests no correlation? So would this mean most of the instability is due to the centromeres and length so not very good example
-arm_adj_scores = arms[,'bps']/arms[,'length']
-cor.test(arm_adj_scores, arms[,'length'])
+# CENT  chr1 and 22 lower the correlation between length and count
+inc=c(2:21)
+inc=c(1:22)
 
-plot(arm_adj_scores, arms[,'length'], type="n", main="Chromosome Arms vs Calculated base pairs", xlab="Breakpoint counts", ylab="Base pair counts for arms")
-text(arm_adj_scores, arms[,'length'], labels=names(arm_adj_scores))
+plot(cent_counts$count, cent_counts$length, type='n')
+text(cent_counts$count, cent_counts$length, labels=rownames(cent_counts)[inc])
+# 22 appears to be an outlier, but doesn't seem to drive the correlation
+cor.test(cent_counts$count, cent_counts$length) # low correlation but it is there
 
-adj_factor = 0.7
+cor.test(cent_counts$count, cent_counts$length) # low correlation but it is there
+cor.test(cent_counts$count, cent_counts$genes) # low correlation but it is there
+
+# without 1 and 22, 17 is the outlier
+length_adj=0.9
+cent_adj_scores = cent_counts$count/(cent_counts$length^length_adj)
+cor.test(cent_adj_scores[inc], cent_counts$length[inc])
+plot(cent_adj_scores[inc], type='n')
+text(cent_adj_scores[inc], labels=rownames(cent_counts)[inc])
+
+
+# ARMS highly correlated still, so perhaps not driven by the centromere?
+cor.test(arm_counts$count,arm_counts$length) 
+cor.test(arm_counts$count,arm_counts$genes) 
+length_adj=0.7
+arm_adj_scores = arm_counts[,'count']/(arm_counts[,'length']^length_adj)
+cor.test(arm_adj_scores, arm_counts[,'length'])
+
+plot(arm_adj_scores, arm_counts[,'length'], type="n", main="Chromosome Arms vs Calculated base pairs", xlab="Breakpoint counts", ylab="Base pair length for arms")
+text(arm_adj_scores, arm_counts[,'length'], labels=rownames(arm_counts))
+
+
 ## So centromeres don't have protein coding genes so if we compare (the way we did with whole chromosomes) to information encoded in total on just the arms...
-arm_adj_scores = arms[,'bps']/(arms[,'length']^adj_factor)
-cor.test(arm_adj_scores, arms[,'length'])
 #and now we can (sorta) say that chromosome instability related directly to the amount of information encoded on that chromosome
 cor.test(arm_adj_scores, arms[,'genes'])
+cor.test(cent_adj_scores, arms[,'genes']) # no correlation at all for centromeres
 
 
 # Again look at distribution - it's normal, not sure that I'd expect that to change really
@@ -133,14 +146,41 @@ for(i in 1:length(arm_adj_scores))
 	}
 
 instability_score=arm_probability_list
-cor.test(instability_score,arms[,'genes'])
 
-ins_fit = hclust(dist(instability_score))
-groups = cutree(ins_fit, k=3)
-plot(ins_fit, main="Chromosome Arm Instability")
-rect.hclust(ins_fit, k=3, border=c("red", "blue", "green"))
+
+plot(instability_score,arm_counts$genes/(arm_counts$length^length_adj), main="Chromosome Instability, Arms", xlab="Chromosome instability score",
+     ylab="Length normalized protein count", type="n")
+text(instability_score,arm_counts$genes/(arm_counts$length^length_adj),labels=rownames(arm_counts),col='blue')
+
+plot(instability_score, chrinfo[c,"Confirmed.proteins"]/(chrinfo[c,"Base.pairs"]^length_adjust), 
+     main="Chromosome Instability",
+     sub=corr_str,xlab="Chromosome instability score",ylab="Length normalised protein count", type="n")
+text(instability_score, chrinfo[c,"Confirmed.proteins"]/(chrinfo[c,"Base.pairs"]^length_adjust),labels=names(instability_score), col='blue')
+
+
+hc = hclust(dist(instability_score))
+groups = cutree(hc, k=3)
+plot(hc, main="Chromosome Instability", cex=2)
+rect.hclust(hc, k=3, border=c("red", "blue", "green"))
+
+plot(hc, col = "#487AA1", col.main = "#45ADA8", col.lab = "#7C8071",
+     col.axis = "#F38630", lwd = 3, lty = 3, sub = '', hang = -1, axes = FALSE)
+rect.hclust(hc, k=3, border=c("red", "blue", "green"))
+
+source("http://addictedtor.free.fr/packages/A2R/lastVersion/R/code.R")
+
+A2Rplot(hc, k = 3, boxes = FALSE, col.up = "gray50", col.down = c("red", "blue", "purple"), main="Chromosome Instability")
+
+
+
 
 #filename = "~/Analysis/Database/cancer/arm_chr_instability_prob.txt"
 #write("# Normal distribution, probability score per chromosome. Each score is independent of the other chromosomes", file=filename, app=F)
 #write.table( arm_probability_list/sum(arm_probability_list), quote=F, col.names=F, sep="\t", app=T, file=filename)
+
+ks.test(cent_adj_scores, pnorm, mean(cent_adj_scores), sd(cent_adj_scores)) # on the other hand, centromere bps are not normally distributed
+
+write.table(bp[1:10,c('name','total.karyotypes')], row.names=F, quote=F,sep="\t")
+
+
 

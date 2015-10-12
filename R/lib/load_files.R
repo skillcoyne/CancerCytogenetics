@@ -1,4 +1,30 @@
 
+load.breakpoints<-function(files)
+  {
+  bp = NULL
+  for (file in files)
+    bp = rbind(bp, read.table(file, sep="\t", header=T))
+  bp = bp[bp$total.karyotypes > 0,]
+
+  bp$name = paste(bp$chr,bp$band,sep="")
+  bp$name = sub("\\.[0-9]+","",bp$name)
+  
+  bp = bp[,c('chr','band','name','total.karyotypes')]
+  
+  for (x in names(which(table(bp$name) > 1)))
+    {
+    rows = which(bp$name == x)
+    sum = sum(bp[rows, 'total.karyotypes'])
+    newrow = bp[rows[grep("\\.[0-9]+",bp[rows, 'band'],invert=T)],][1,]
+    newrow[,'total.karyotypes'] = sum
+    bp = bp[-rows,]
+    bp = rbind(bp,newrow)
+    }
+  bp = bp[order(-bp$total.karyotypes),] 
+  return(bp)
+  }
+
+
 loadBands<-function(file = "../../genomic_info/chromosome_bands.csv")
   {
   t = read.table(file, sep=",", header=T)

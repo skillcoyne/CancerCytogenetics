@@ -8,8 +8,12 @@
 ## Note that chromosomes 19,20,22 don't have enough observations due to the fact that most/all of their breakpoints occur within centromeres
 
 rm(list=ls())
+setwd("~/workspace/CancerCytogenetics/R")
+source("lib/load_files.R")
+source("lib/wd.R")
 
-cor.tests<-function(scores, col="total.karyotypes")
+
+cor.adj<-function(scores, col="total.karyotypes")
   {
   test_cols = c('length', 'gene.count', 'ks.gene', 'length.normalized', 'gene.normalized', 'ks.normalized')
   bk_tests = as.data.frame( matrix( nrow=1, ncol=length(test_cols)) )
@@ -59,9 +63,9 @@ cor.tests<-function(scores, col="total.karyotypes")
   return(list("tests" = bk_tests, "scores" = adj_scores))
   }
 
-bp.cor.tests<-function(bpinfo, col)
+bp.cor.tests<-function(bpinfo, col, chromosomes = c(1:22, 'X'))
   {
-  chromosomes = c(1:22, 'X')
+  #chromosomes = c(1:22, 'X')
   
   test_cols = c('length', 'gene.count', 'ks.gene', 'length.normalized', 'gene.normalized', 'ks.normalized')
   bk_tests = as.data.frame( matrix( nrow=length(chromosomes), ncol=length(test_cols)) )
@@ -83,7 +87,7 @@ bp.cor.tests<-function(bpinfo, col)
     scores[parm,] = p
   
     tryCatch({
-      ct = cor.tests(scores, col)
+      ct = cor.adj(scores, col)
       
       bk_tests[chr, ] = ct$tests
       as = ct$scores
@@ -152,74 +156,198 @@ setwd(datadir)
 total_karyotypes = 100240
 
 bandinfo = read.table("~/Data/sky-cgh/genomic_info/band_genes.txt", header=T, sep="\t")
+bandinfo$bp.length = bandinfo$end - bandinfo$start
+bandinfo$chr = as.character(bandinfo$chr)
+bandinfo$band = as.character(bandinfo$band)
 
-df = read.table("current/noleuk-breakpoints.txt", sep="\t", header=T)
-#df = read.table("current/leuk-breakpoints.txt", sep="\t", header=T)  # sampled leuk bp's to cut down on bias
 
-## To simplify, the bands with < 5 aberrations are all subbands.  We're only dealing with major bands and these
-# don't make a difference in the analysis
-df = df[-which(df[,'total.karyotypes'] <= 5),]
+correlations = matrix(nrow=3,ncol=3,dimnames=list(c('cor.all','cor.nophil','adj.genes'),c('all','centromeres','arms')))
 
-break_info = merge(df, bandinfo[,c(1,2,5)], by.x=c('chr', 'band'), by.y=c('chr','band'))
-break_info$bp.length = break_info$end - break_info$start
-all = break_info
+leuk = T
+
+# Load files
+df = load.breakpoints("current/noleuk-breakpoints.txt")
+if (leuk)
+  df = load.breakpoints(c("current/noleuk-breakpoints.txt", "current/leuk-breakpoints.txt"))
+
+all = merge(df,bandinfo,by=c('chr','band'))
+all$start=NULL
+all$end=NULL
 
 # All bands with breaks but NO genes are in the centromere regions...pull them out see if correlations improve
 # Note that not all centromeres lack genes apparently
 
 # Not using this for anything, it mostly just confirms the chromosome instability analysis
-allcors = bp.cor.tests(break_info, "total.karyotypes")
+allcors = bp.cor.tests(all, "total.karyotypes")
 plot.cor(allcors$tests)
+dev.off()
+
+ct = cor.test(all$total.karyotypes, all$bp.length)
+correlations['cor.all','all'] = ct$estimate
+
+
+plot(all$total.karyotypes, all$gene.count,type='n', main="Per Band", ylab="Gene", xlab="# Breakpoints")
+text(all$total.karyotypes, all$gene.count,labels=paste(all$chr,all$band,sep=""))
+
+noPhil = which(paste(all$chr,all$band,sep="") != '22q11' & paste(all$chr,all$band,sep="") != "9q34")
+
+ct = cor.test(all$total.karyotypes[noPhil], all$bp.length[noPhil])
+correlations['cor.nophil','all'] = ct$estimate
+
+all_adj = all$total.karyotypes/(all$bp.length^0.7)
+cor.test(all_adj, all$bp.length)
+ks.test(all_adj, pnorm, mean(all_adj), sd(all_adj))
+plot.norm(all_adj, "all")
+ct = cor.test(all_adj, all$gene.count)
+correlations['adj.genes','all'] = ct$estimate
+
+
 
 ## CLASS 1 ##
-cmrows = grep("(11|12)", break_info$band)
-centromeres = break_info[ cmrows, ]
+cmrows = grep("(p|q)11", all$band)
+centromeres = all[ cmrows, ]
 centromeres = centromeres[order(centromeres$chr, decreasing=T),]
 
-# centromeres show a correlation with length, not surprised
-cor.test(centromeres[,'bp.length'], centromeres[,'total.karyotypes'])
+dev.off()
+# centromeres show a correlation with length, not surprised -- 22q11 skews this a little but not significantly
+ct = cor.test(centromeres[,'total.karyotypes'],centromeres[,'bp.length'])
+correlations['cor.all','centromeres'] = ct$estimate
 
-length_adj = 0.6
-# Normalize the total for length  and the correlation drops
+par(mfrow=c(2,1))
+plot(centromeres[,'total.karyotypes'],centromeres[,'gene.count'], type='n', main="Per Centromere", ylab="Gene count", xlab="# Breakpoints")
+text(centromeres[,'total.karyotypes'],centromeres[,'gene.count'], labels=unlist(apply(centromeres[,c('chr','band')], 1, paste, collapse="")))
+
+plot(centromeres[,'total.karyotypes'],centromeres[,'bp.length'], type='n', main="Per Centromere", ylab="Length", xlab="# Breakpoints")
+text(centromeres[,'total.karyotypes'],centromeres[,'bp.length'], labels=unlist(apply(centromeres[,c('chr','band')], 1, paste, collapse="")))
+
+noPhil = which(centromeres$name != '22q11')
+ct = cor.test(centromeres[noPhil,'total.karyotypes'],centromeres[noPhil,'bp.length'])
+correlations['cor.nophil','centromeres'] = ct$estimate
+
+length_adj = 0.4
+# Normalize for length  and the correlation drops
+
 cent_adj = centromeres[,'total.karyotypes']/(centromeres[,'bp.length']^length_adj)
 cor.test(cent_adj, centromeres[,'bp.length'])
+cor.test(cent_adj[noPhil], centromeres[noPhil,'bp.length'])
 
-# not really normal, so adjusted scores maybe best I can do -- er, this is actually the same thing I use in all the others too...
+ct = cor.test(cent_adj, centromeres[,'gene.count'])
+correlations['adj.genes','centromeres'] = ct$estimate
+
+
+
+# not enough observations per chromosome to test normality per chromosome
+# not really normal, so adjusted scores may be best I can do 
 ks.test(cent_adj, pnorm, mean(cent_adj), sd(cent_adj))
 
-## 22q11 is an outlier, and now it's normal.  
+## 22q11 is an outlier, and it's better but still not normal  
 drop22 = cent_adj[ cent_adj < max (cent_adj) ]
 ks.test(drop22, pnorm, mean(drop22), sd(drop22))
 
-centromeres$bp.prob = round(cent_adj/sum(cent_adj), 5)
+# get probabilities from pnorm then adjust to 1 
+cent_adj = unlist(bp.cor.tests(centromeres,'total.karyotypes', c(1:22,'X','Y'))$scores)
+names(cent_adj) =  sub("\\.","", names(cent_adj))
+centromeres[match(names(cent_adj), centromeres$name), 'bp.prob'] =  adjust.to.one(cent_adj, 5)
 
-break_info = break_info[ -cmrows,] 
+## Arms
+arms = all[-cmrows,]
+arms = arms[order(arms$chr,decreasing=T),]
+ct = cor.test(arms$total.karyotypes,arms$bp.length)
+correlations['cor.all','arms'] = ct$estimate
+
+
+plot(arms$total.karyotypes,arms$bp.length, type='n')
+text(arms$total.karyotypes,arms$bp.length, labels=unlist(apply(arms[,c('chr','band')], 1, paste, collapse="")))
+
+noPhil = which(arms$name != '9q34')
+ct = cor.test(arms$total.karyotypes[noPhil],arms$bp.length[noPhil])
+correlations['cor.nophil','arms'] = ct$estimate
+
+length_adj = 0.6
+arm_adj = arms[,'total.karyotypes']/(arms[,'bp.length']^length_adj)
+cor.test(arm_adj, arms[,'bp.length'])
+
+ct = cor.test(arm_adj, arms[,'gene.count'])
+correlations['adj.genes','arms'] = ct$estimate
+
+dev.off()
+colors=c('firebrick3','blue','green3')
+bp = barplot((correlations), beside=T, col=colors, border=NA, ylim=c(0,0.45), main="Karyotype Count Correlations", ylab="Pearson's correlation", cex=2, cex.axis=1.5)
+legend('topleft', legend=c('All(v)Length','-22q11,9q34(v)Length', '(v)Length Adj. Gene'), fill=colors, border=NA)
+for (i in 1:nrow(bp))
+  text(bp[i,], round(correlations[i,]+.01,2), labels=round(correlations[i,], 2), cex=1.5)
+
+## So if I look at the chromosomal instability as a whole without centromeres?
+chrs = c(1:22,'X','Y')
+arm_chr = as.data.frame(matrix(nrow=length(chrs), ncol=3, dimnames=list(chrs,c('total.karyotypes', 'gene.count','length'))))
+arm_chr[,'total.karyotypes'] = unlist(lapply(chrs, function(x)  sum(arms[arms$chr == x, 'total.karyotypes'])))
+arm_chr[,'gene.count'] = unlist(lapply(chrs, function(x)  sum(arms[arms$chr == x, 'gene.count'])))
+arm_chr[,'length'] = unlist(lapply(chrs, function(x)  sum(arms[arms$chr == x, 'bp.length'])))
+
+
+cor.test(arm_chr$total.karyotypes,arm_chr$length)
+cor.test(arm_chr$total.karyotypes,arm_chr$gene.count)
+
+
 # If you compare this to the "all" correlations above the gene correlations get better (for obvious reasons)
-nocm = bp.cor.tests(break_info, "total.karyotypes")
-plot.cor(nocm$tests)
-chr_adj_scores = nocm$scores
+arm.cor =  bp.cor.tests(arms, "total.karyotypes")
+plot.cor(arm.cor$tests)
+arm_adj_scores = arm.cor$scores
 
-# scores per breakpoint within each chromosome
-for (i in 1:length(chr_adj_scores))
+chrs=c(1:22)
+length_adj=0.7
+cor.test(arm_chr$total.karyotypes[chrs], arm_chr$length[chrs])
+arm_adj_scores = arm_chr$total.karyotypes[chrs]/(arm_chr$length[chrs]^length_adj)
+cor.test(arm_adj_scores, arm_chr$length[chrs])
+cor.test(arm_adj_scores, arm_chr$gene.count[chrs])
+
+instability_score = pnorm(arm_adj_scores,mean(arm_adj_scores),sd(arm_adj_scores))
+names(instability_score) = rownames(arm_chr)[chrs]
+
+hc = hclust(dist(instability_score))
+groups = cutree(hc, k=3)
+plot(hc, main="Chromosome Instability", cex=2)
+rect.hclust(hc, k=3, border=c("red", "blue", "green"))
+
+plot(hc, col = "#487AA1", col.main = "#45ADA8", col.lab = "#7C8071",
+     col.axis = "#F38630", lwd = 3, lty = 3, sub = '', hang = -1, axes = FALSE)
+rect.hclust(hc, k=3, border=c("red", "blue", "green"))
+
+source("http://addictedtor.free.fr/packages/A2R/lastVersion/R/code.R")
+
+A2Rplot(hc, k = 3, boxes = FALSE, col.up = "gray50", col.down = c("red", "blue", "purple"), main="Chromosome Instability")
+
+for (i in 1:3)
+{
+  print(paste("Group", i))
+  print(groups[groups == i])  
+  print(instability_score[groups == i])
+}
+
+
+
+
+
+# scores per breakpoint within each chromosome arms
+for (i in 1:length(arm_adj_scores))
   {
-  chr = names(chr_adj_scores[i])
-  probability_list = pnorm(chr_adj_scores[[chr]], mean(chr_adj_scores[[chr]]), sd(chr_adj_scores[[chr]]))
+  chr = names(arm_adj_scores[i])
+  probability_list = pnorm(arm_adj_scores[[chr]], mean(arm_adj_scores[[chr]]), sd(arm_adj_scores[[chr]]))
   pf = as.data.frame( round(probability_list/sum(probability_list), 5) )  # prob adjusted to 0-1
   pf$band = row.names(pf)
   
-  per_chr = merge(break_info[break_info$chr == chr,], pf, by=c('band'))
+  per_chr = merge(all[all$chr == chr,], pf, by=c('band'))
   names(per_chr)[length(per_chr)] = 'per.chr.prob'
-  if (exists("temp_bk"))  temp_bk = rbind(temp_bk, per_chr) 
-  else  temp_bk = per_chr 
+  if (exists("temp_bk"))  temp_bk = rbind(temp_bk, per_chr) else  temp_bk = per_chr 
   }
-break_info = temp_bk
+arm_break_info = temp_bk
 rm(temp_bk)
 
 
-# scores per breakpoint across entire dataset
-arms = cor.tests(break_info, "total.karyotypes")
-bp_adj_scores = arms$scores
-probability_list = pnorm(bp_adj_scores[,'scores'], mean(bp_adj_scores[,'scores']), sd(bp_adj_scores[,'scores']))
+# scores per arm breakpoint across entire dataset
+arms = cor.adj(arm_break_info, "total.karyotypes")
+arm_bp_adj_scores = arms$scores
+probability_list = pnorm(arm_bp_adj_scores[,'scores'], mean(arm_bp_adj_scores[,'scores']), sd(arm_bp_adj_scores[,'scores']))
 bp_adj_scores[,'bp.prob'] = round(probability_list/sum(probability_list), 5)
 
 # these two are outliers and known leukemia bps

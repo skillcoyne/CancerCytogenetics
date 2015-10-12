@@ -19,9 +19,6 @@ def process_results(filters)
 end
 
 
-
-
-
 biomart = Biomart::Server.new("http://www.ensembl.org/biomart")
 $hsgene = biomart.datasets['hsapiens_gene_ensembl']
 
@@ -45,11 +42,10 @@ files.each do |file|
 
     regions << "#{chr}:#{start}-#{chr}:#{stop}"
     if regions.length >= 400
-      puts "Searching #{regions.size} regions of chromosome #{chr}"
+		 	print "." 
       filters = {
           'chromosomal_region' => regions,
-          'transcript_status' => ["KNOWN"],
-          #'biotype' => ["protein_coding"],
+          'biotype' => ["protein_coding"],
           'status' => ["KNOWN"]
       }
       mut_genes << process_results(filters)
@@ -68,7 +64,7 @@ files.each do |file|
   filters = {
       "chromosome_name" => [current_chr],
       'transcript_status' => ["KNOWN"],
-      #'biotype' => ["protein_coding"],
+      'biotype' => ["protein_coding"],
       'status' => ["KNOWN"]
   }
   all_genes = process_results(filters)
@@ -87,8 +83,4 @@ files.each do |file|
 end
 
 puts "Done."
-
-
-
-
 
